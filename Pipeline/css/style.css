@@ -1,0 +1,62 @@
+*{
+	margin: 5px;
+	padding: 0;
+}
+html,body{
+	height: 100%;
+}
+
+.resume{
+	margin: 10px auto;
+	padding: 70px;
+	font-size: 30px;
+}
+.list,.list2,.list3,.list4{
+	list-style-position: inside;
+	margin-left: 20px;
+	font-size: 30px;
+}
+.Model_History,.HypTest,.overall,.QQ_plots,.std_residuals,.CI_intervals{
+	margin-top: 100px;
+}
+.text2{
+	color: red;
+}
+.history_log{
+	display: block;
+  	margin: 0 auto;
+  	width: 50%;
+}
+table{
+	margin-left: auto;
+	margin-right: auto;
+}
+th, td {
+  padding: 8px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+}
+tr:nth-child(even) {background-color: #f2f2f2;}
+
+.column {
+  float: left;
+  width: 40%;
+
+}
+a{
+	color: black;
+}
+/* Clear floats after image containers */
+.row::after {
+  content: "";
+  margin: 0 auto;
+  clear: both;
+  display: table;
+}
+.overall{
+	margin-left: 5px;
+	}
+.frame1{
+	margin-left: auto;
+	margin-right: auto;
+}
