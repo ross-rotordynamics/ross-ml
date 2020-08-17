@@ -457,32 +457,35 @@ if not os.path.isdir(path2):
 
 
 
-df = pd.read_csv('seal_fake.csv')#('xllaby_data-componentes.csv')
-df_val= pd.read_csv('xllaby_data-componentes.csv')
-df_val.fillna(df.mean)
+df = pd.read_csv('seal_fake.csv')# Base de dados inflada com 100k pontos('xllaby_data-componentes.csv')
+df_val= pd.read_csv('xllaby_data-componentes.csv') # Validação com a base de dados original
+df_val.fillna(df.mean) # Substitui-se aqui os possíveis NaNs pela média das linhas do dataframe. Outras estratégias são possíveis.
+# Em distribuições de caudas pesadas, o ideal é utilizar a mediana no local. Para ver a cara da distribuição use sns.pairplot(df)
 #df.drop(['label'],axis = 1,inplace = True)
-D = pipeline(df)
-D.set_features(0,20)
-D.set_labels(20,len(D.df.columns))
+
+# INÍCIO DO ALGORITMO
+D = pipeline(df) # Instanciando o dataframe no Pipeline
+D.set_features(0,20) # Indicando quem é o X
+D.set_labels(20,len(D.df.columns)) # indicando quem é o y
 #D.feature_reduction(3)
-D.data_scaling(0.1,scalers = [RobustScaler(),RobustScaler()], scaling = True)
-D.build_Sequential_ANN(1,[20])#,dropout_layers = [1,2,3],dropout = [0.5,0.5,0.5])
-model,predictions = D.model_run(batch_size = 1024,epochs =1000) 
-#model.get_config()
-D.model_history()
-D.metrics()
-postproc = postprocessing(D.train,D.test)
-postproc.show_overall_results()
-postproc.show_confidence_bounds(a = 0.01)
-postproc.standardized_error_plot()
-postproc.q_q_plot()
+D.data_scaling(0.1,scalers = [RobustScaler(),RobustScaler()], scaling = True) # Escalando os dados. Este passo é altamente recomendado!
+D.build_Sequential_ANN(1,[20])#,dropout_layers = [1,2,3],dropout = [0.5,0.5,0.5]) # Construção da rede neural
+model,predictions = D.model_run(batch_size = 1024,epochs =1000) # Rodando a rede
+#model.get_config() - Comando para variar os parâmetros da rede...Veja a documentação para mais detalhes( EM CONSTRUÇÃO!!!!)
+D.model_history() # Histórico da rede, com a função de perdas
+D.metrics() # Métricas possíveis...Talvez eu dê a opção para o usuário escolher, mas tal escolha é recomendada para usuários avançados...
+postproc = postprocessing(D.train,D.test) # Pós processamento dos resultados
+postproc.show_overall_results()  
+postproc.show_confidence_bounds(a = 0.01) # Determinação do intervalo de confiança para os dados da rede
+postproc.standardized_error_plot() # Erro padronizado para medidas de heterocedasticidade, característica que impacta no intervalo de confiança final dos rotores
+postproc.q_q_plot() # Gráfico quantil-quantil para uma visualização preliminar da performance da rede
 #url = 'results.html'
-D.hypothesis_test()
+D.hypothesis_test() # Teste de hipótese para verificar se a rede se adequa aos dados da validação
 #webbrowser.open(url,new=2)
-E = pipeline(df_val)
-X,y = E.set_features(0,20),E.set_labels(20,len(E.df.columns))
-E.scaler1 = D.scaler1
-E.scaler2 = D.scaler2
+E = pipeline(df_val) # Procedimento de validação. Também se insere no pipeline os dados validados.
+X,y = E.set_features(0,20),E.set_labels(20,len(E.df.columns)) # Idêntico ao acima...
+E.scaler1 = D.scaler1 # Definindo o procedimento de escalar X idêntico ao anterior (OBRIGATÓRIO)
+E.scaler2 = D.scaler2 # Definindo o procedimento de escalar X idêntico ao anterior (OBRIGATÓRIO)
 train,test = E.validation(X,y)
 postproc = postprocessing(train,test)
 postproc.show_overall_results()
@@ -490,4 +493,4 @@ postproc.show_confidence_bounds(a = 0.01)
 postproc.standardized_error_plot()
 postproc.q_q_plot()
 url = 'results.html'
-webbrowser.open(url,new=2)
+webbrowser.open(url,new=2) # Abre a validação numa página HTML
