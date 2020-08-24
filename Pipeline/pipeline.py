@@ -23,6 +23,8 @@ from sklearn.feature_selection import SelectKBest,mutual_info_regression,f_regre
 from statsmodels.stats.diagnostic import het_breuschpagan
 from sklearn.decomposition import PCA
 from statsmodels.distributions.empirical_distribution import ECDF
+from sklearn.tree import DecisionTreeRegressor
+from pickle import dump,load
 
 def HTML_formater(df,name):
     html_string = '''
@@ -41,6 +43,12 @@ def HTML_formater(df,name):
 
 class pipeline:
     def __init__(self,df):
+        path1 = 'img'
+        path2 = 'tables'      
+        if not os.path.isdir(path1):
+            os.makedirs(path1)
+        if not os.path.isdir(path2):
+            os.makedirs(path2)
         self.df = df
         self.df.dropna(inplace = True)
     
@@ -100,21 +108,33 @@ class pipeline:
             Minimum number of features that satisfies N_top for each label
 
         '''
-        col_x = self.X.columns
-        col_y = self.y.columns
-        best_features = []
-        X = self.df[col_x]
-        for var in col_y:
-            y = self.df[col_y][var]
-            bestfeatures = SelectKBest(score_func=mutual_info_regression, k=N_top)#bestfeatures = SelectKBest(score_func=f_regression, k=N_top)
-            fit = bestfeatures.fit(X,y)
-            #dfscores = pd.DataFrame(fit.scores_)
-            #dfcolumns = pd.DataFrame(X.columns)
-            featureScores = pd.concat([pd.DataFrame(X.columns),pd.DataFrame(fit.scores_)],axis=1)
-            featureScores.columns = ['Specs','Score']  #naming the dataframe columns
-            best_features.append(featureScores.nlargest(N_top,'Score')['Specs'].values)
-        best_features = np.unique(np.array(best_features))
-        self.X = self.X[best_features]
+        # define the model
+        model = DecisionTreeRegressor()
+        # fit the model
+        model.fit(self.X, self.y)
+        # get importance
+        importance = model.feature_importances_
+        # summarize feature importance
+        featureScores = pd.concat([pd.DataFrame(self.X.columns),pd.DataFrame(importance)],axis=1)
+        featureScores.columns = ['Specs','Score']
+        self.best = featureScores.nlargest(N_top,'Score')['Specs'].values
+        # col_x = self.X.columns
+        # col_y = self.y.columns
+        # best_features = []
+        # X = self.df[col_x]
+        # for var in col_y:
+        #     y = self.df[col_y][var]
+        #     bestfeatures = SelectKBest(score_func=mutual_info_regression, k=N_top)#bestfeatures = SelectKBest(score_func=f_regression, k=N_top)
+        #     fit = bestfeatures.fit(X,y)
+        #     #dfscores = pd.DataFrame(fit.scores_)
+        #     #dfcolumns = pd.DataFrame(X.columns)
+        #     featureScores = pd.concat([pd.DataFrame(X.columns),pd.DataFrame(fit.scores_)],axis=1)
+        #     featureScores.columns = ['Specs','Score']  #naming the dataframe columns
+        #     best_features.append(featureScores.nlargest(N_top,'Score')['Specs'].values)
+        # best_features = np.unique(np.array(best_features))
+        #self.X = self.X[best_features]
+        
+        self.X = self.X[self.best]
         return self.X
     
     def data_scaling(self,test_size,scaling = True,scalers = []):
@@ -185,7 +205,8 @@ class pipeline:
                 self.model.add(Dropout(dropout[j]))
                 j+=1
             self.model.add(Dense(neurons[i],activation='relu'))
-        self.model.add(Dense(len(self.y.columns))) 
+        self.model.add(Dense(len(self.y.columns)))
+        self.config = self.model.get_config()
         return self.model
     
     def model_run(self,optimizer = 'adam',loss = 'mse',batch_size = 16,epochs = 500):
@@ -295,7 +316,57 @@ class pipeline:
             self.train = pd.DataFrame(model.predict(X_scaled),columns = y.columns)
         return self.train,self.test
     def save_model(self,name):
-        self.model.save(name+'.h5')
+        if not os.path.isdir(name):
+            os.makedirs(name)
+        self.model.save(r'{}/{}.h5'.format(name,name))
+        dump(self.y.columns,open(r'{}/{}_columns.pkl'.format(name,name),'wb'))
+        dump(self.best,open(r'{}/{}_best_features.pkl'.format(name,name),'wb'))
+        if self.scaler1 != None:
+            dump(self.scaler1, open(r'{}/{}_scaler1.pkl'.format(name,name), 'wb'))
+        if self.scaler2 != None:
+            dump(self.scaler2, open(r'{}/{}_scaler2.pkl'.format(name,name), 'wb'))
+            
+                
+class Model():
+    def __init__(self,name):
+        self.name = name
+    def load_model(self):
+        self.model = load_model(r'{}/{}.h5'.format(self.name,self.name))
+        self.columns = load(open(r'{}/{}_columns.pkl'.format(self.name,self.name), 'rb'))
+        #load best features
+        try:
+            self.best = load(open(r'{}/{}_best_features.pkl'.format(self.name,self.name),'rb'))
+        except:
+            self.best = None
+        # load the scaler
+        try:
+            self.scaler1 = load(open(r'{}/{}_scaler1.pkl'.format(self.name,self.name), 'rb'))
+        except:
+            self.scaler1 = None
+        try:
+            self.scaler2 = load(open(r'{}/{}_scaler2.pkl'.format(self.name,self.name), 'rb'))
+        except:
+            self.scaler2 = None
+        #return self.model
+    def predict(self,X):
+        if self.best is None:
+            self.X = X
+        else:
+            self.X = X[self.best]
+        if self.scaler1!= None:
+            self.X = self.scaler1.transform(self.X)
+        else:
+            self.X = X
+        if self.scaler2!= None:
+            predictions = self.model.predict(self.X)
+            self.results = pd.DataFrame(self.scaler2.inverse_transform(predictions),columns = self.columns)
+        else:
+            self.results =  pd.DataFrame(predictions,columns = self.columns)
+        return self.results
+            
+        
+        
+    
     
     
     
@@ -346,24 +417,7 @@ class postprocessing():
             plt.savefig(r'img\CI_{}.png'.format(v), dpi=1000, facecolor='w', edgecolor='k',
         orientation='portrait',format='png')
             plt.close()
-        #for row in axes:
-           # for col in row:
-                #F = ECDF(self.train[var[i]])
-                #G = ECDF(self.test[var[i]])
-                #Gu = [min(Gn+en,1) for Gn in G.y]
-                #Gl = [max(Gn-en,0) for Gn in G.y]
-                #col.plot(G.x,Gu,label = '{} - 95% CI'.format(var[i]),ls = '--',color = 'black')
-                #col.plot(G.x,Gl,ls = '--',color = 'black')
-                #col.plot(G.x,G.y,label = ' test {}'.format(var[i]),ls = '-')
-                #col.plot(F.x,F.y,label = 'train {}'.format(var[i]),ls = ':',linewidth = 2,color = 'magenta')
-                #col.legend()
-                #col.set_xscale('symlog')
-                #i+=1
-        #figure.tight_layout(pad=0.05)
-        #figure.set_figheight(9)
-        #figure.set_figwidth(12)
-        #figure.savefig('CI.png', dpi=1000, facecolor='w', edgecolor='k',
-        #orientation='portrait',format='png')
+        
     def q_q_plot(self):
         var = list(self.train.columns)#[0:4]
         for v in var:
@@ -374,19 +428,6 @@ class postprocessing():
             plt.savefig(r'img\qq_plot_{}.png'.format(v), dpi=1000, facecolor='w', edgecolor='k',
         orientation='portrait',format='png')
             plt.close()
-            
-        #figure, axes = plt.subplots(nrows=2, ncols=2)
-        #for row in axes:
-            #for col in row:
-                #col.scatter(self.test[var[i]],self.train[var[i]],color='orange',label = 'pontos de teste - {}'.format(var[i]))
-                #col.plot(self.test[var[i]],self.test[var[i]],'b',label = '$y_{teste}=y_{treino}$')
-                #col.legend()
-                #i+=1
-        #figure.tight_layout(pad=0.05)
-        #figure.set_figheight(6)
-        #figure.set_figwidth(8)
-        #figure.savefig('qq_plot.png', dpi=1000, facecolor='w', edgecolor='k',
-        #orientation='portrait',format='png')
     def standardized_error_plot(self):
         var = list(self.train.columns)#[0:8]
         erro = self.test-self.train
@@ -403,21 +444,6 @@ class postprocessing():
         orientation='portrait',format='png')
             plt.close()
            
-        #figure, axes = plt.subplots(nrows=4, ncols=2)
-        #for row in axes:
-            #for col in row:
-                #erro = self.test[var[i]]-self.train[var[i]]
-                #col.set_xscale('symlog')
-                #col.scatter(self.test[var[i]],erro/erro.std(),color='orange',label = 'pontos de teste - {}'.format(var[i]))
-                #col.axhline(0, ls='--',color = 'blue')#plot(self.test[var[i]],np.zeros(len(test[var[i]])),'--b',label = r'$\sigma$=0')
-                #col.legend()
-                #col.title()
-                #i+=1
-        #figure.tight_layout(pad=0.05)
-        #figure.set_figheight(6)
-        #figure.set_figwidth(8)
-        #figure.savefig('standardized_error_plot.png', dpi=1000, facecolor='w', edgecolor='k',
-        #orientation='portrait',format='png')
     def residuals_resume(self):
         erro_std = ((self.test-self.train)/(self.test-self.train).std())
         plt.figure(figsize=(16,9))
@@ -436,17 +462,17 @@ class postprocessing():
         plt.legend()
         plt.savefig('img\residuals_resume.png', dpi=1000, facecolor='w', edgecolor='k',
         orientation='portrait',format='png')
+    @staticmethod
+    def show(url = 'results.html'):
+        return webbrowser.open(url,new=2)
+        
     
     
     
         
         
-path1 = 'img'
-path2 = 'tables'      
-if not os.path.isdir(path1):
-    os.makedirs(path1)
-if not os.path.isdir(path2):
-    os.makedirs(path2)
+    
+
 
 
 
@@ -454,43 +480,33 @@ if not os.path.isdir(path2):
                
                 
     
+# Example: 
 
-
-
-df = pd.read_csv('seal_fake.csv')# Base de dados inflada com 100k pontos('xllaby_data-componentes.csv')
-df_val= pd.read_csv('xllaby_data-componentes.csv') # Validação com a base de dados original
-df_val.fillna(df.mean) # Substitui-se aqui os possíveis NaNs pela média das linhas do dataframe. Outras estratégias são possíveis.
-# Em distribuições de caudas pesadas, o ideal é utilizar a mediana no local. Para ver a cara da distribuição use sns.pairplot(df)
+#df = pd.read_csv('seal_fake.csv')#('xllaby_data-componentes.csv')
+#df_val= pd.read_csv('xllaby_data-componentes.csv')
+#df_val.fillna(df.mean)
 #df.drop(['label'],axis = 1,inplace = True)
-
-# INÍCIO DO ALGORITMO
-D = pipeline(df) # Instanciando o dataframe no Pipeline
-D.set_features(0,20) # Indicando quem é o X
-D.set_labels(20,len(D.df.columns)) # indicando quem é o y
-#D.feature_reduction(3)
-D.data_scaling(0.1,scalers = [RobustScaler(),RobustScaler()], scaling = True) # Escalando os dados. Este passo é altamente recomendado!
-D.build_Sequential_ANN(1,[20])#,dropout_layers = [1,2,3],dropout = [0.5,0.5,0.5]) # Construção da rede neural
-model,predictions = D.model_run(batch_size = 1024,epochs =1000) # Rodando a rede
-#model.get_config() - Comando para variar os parâmetros da rede...Veja a documentação para mais detalhes( EM CONSTRUÇÃO!!!!)
-D.model_history() # Histórico da rede, com a função de perdas
-D.metrics() # Métricas possíveis...Talvez eu dê a opção para o usuário escolher, mas tal escolha é recomendada para usuários avançados...
-postproc = postprocessing(D.train,D.test) # Pós processamento dos resultados
-postproc.show_overall_results()  
-postproc.show_confidence_bounds(a = 0.01) # Determinação do intervalo de confiança para os dados da rede
-postproc.standardized_error_plot() # Erro padronizado para medidas de heterocedasticidade, característica que impacta no intervalo de confiança final dos rotores
-postproc.q_q_plot() # Gráfico quantil-quantil para uma visualização preliminar da performance da rede
+#D = pipeline(df)
+#D.set_features(0,20)
+#D.set_labels(20,len(D.df.columns))
+#D.feature_reduction(15)
+#D.data_scaling(0.1,scalers = [RobustScaler(),RobustScaler()], scaling = True)
+#D.build_Sequential_ANN(4,[50,50,50,50])#,dropout_layers = [1,2,3],dropout = [0.001,0.001,0.001])
+#model,predictions = D.model_run(batch_size = 300,epochs =1000) 
+#model.get_config()
+#D.model_history()
+#D.metrics()
+#postproc = postprocessing(D.train,D.test)
+#postproc.show_overall_results()
+#postproc.show_confidence_bounds(a = 0.01)
+#postproc.standardized_error_plot()
+#postproc.q_q_plot()
+#postproc.show()
 #url = 'results.html'
-D.hypothesis_test() # Teste de hipótese para verificar se a rede se adequa aos dados da validação
-#webbrowser.open(url,new=2)
-E = pipeline(df_val) # Procedimento de validação. Também se insere no pipeline os dados validados.
-X,y = E.set_features(0,20),E.set_labels(20,len(E.df.columns)) # Idêntico ao acima...
-E.scaler1 = D.scaler1 # Definindo o procedimento de escalar X idêntico ao anterior (OBRIGATÓRIO)
-E.scaler2 = D.scaler2 # Definindo o procedimento de escalar X idêntico ao anterior (OBRIGATÓRIO)
-train,test = E.validation(X,y)
-postproc = postprocessing(train,test)
-postproc.show_overall_results()
-postproc.show_confidence_bounds(a = 0.01)
-postproc.standardized_error_plot()
-postproc.q_q_plot()
-url = 'results.html'
-webbrowser.open(url,new=2) # Abre a validação numa página HTML
+#D.hypothesis_test()
+#D.save_model('teste')
+#model = Model('teste')
+#model.load_model()
+#X= pipeline(df_val).set_features(0,20)
+#results = model.predict(X)
+
