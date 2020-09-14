@@ -118,22 +118,6 @@ class pipeline:
         featureScores = pd.concat([pd.DataFrame(self.X.columns),pd.DataFrame(importance)],axis=1)
         featureScores.columns = ['Specs','Score']
         self.best = featureScores.nlargest(N_top,'Score')['Specs'].values
-        # col_x = self.X.columns
-        # col_y = self.y.columns
-        # best_features = []
-        # X = self.df[col_x]
-        # for var in col_y:
-        #     y = self.df[col_y][var]
-        #     bestfeatures = SelectKBest(score_func=mutual_info_regression, k=N_top)#bestfeatures = SelectKBest(score_func=f_regression, k=N_top)
-        #     fit = bestfeatures.fit(X,y)
-        #     #dfscores = pd.DataFrame(fit.scores_)
-        #     #dfcolumns = pd.DataFrame(X.columns)
-        #     featureScores = pd.concat([pd.DataFrame(X.columns),pd.DataFrame(fit.scores_)],axis=1)
-        #     featureScores.columns = ['Specs','Score']  #naming the dataframe columns
-        #     best_features.append(featureScores.nlargest(N_top,'Score')['Specs'].values)
-        # best_features = np.unique(np.array(best_features))
-        #self.X = self.X[best_features]
-        
         self.X = self.X[self.best]
         return self.X
     
