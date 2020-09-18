@@ -1,51 +1,39 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Jul 21 12:10:24 2020
+"""ROSS Machine Learning.
 
-@author: Luan
+ROSS-ML is a module to create neural networks aimed at calculating rotodynamic
+coefficients for bearings and seals.
 """
+# fmt: off
 import os
 import webbrowser
-from tensorflow.keras.models import load_model
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import (
-    MinMaxScaler,
-    StandardScaler,
-    RobustScaler,
-    PowerTransformer,
-    QuantileTransformer,
-    Normalizer,
-    MaxAbsScaler,
-)
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Activation, Dropout
-from tensorflow.keras.optimizers import Adam
-from sklearn.metrics import (
-    mean_squared_error,
-    mean_absolute_error,
-    explained_variance_score,
-    r2_score,
-)
-from scipy.stats import (
-    ks_2samp,
-    entropy,
-    chisquare,
-    ttest_1samp,
-    ttest_ind,
-    skew,
-    normaltest,
-)
-from keras.regularizers import l2
-from sklearn.feature_selection import SelectKBest, mutual_info_regression, f_regression
-from statsmodels.stats.diagnostic import het_breuschpagan
-from sklearn.decomposition import PCA
-from statsmodels.distributions.empirical_distribution import ECDF
-from sklearn.tree import DecisionTreeRegressor
 from pickle import dump, load
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from keras.regularizers import l2
+from matplotlib import pyplot as plt
+from scipy.stats import (chisquare, entropy, ks_2samp, normaltest, skew,
+                         ttest_1samp, ttest_ind)
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import (SelectKBest, f_regression,
+                                       mutual_info_regression)
+from sklearn.metrics import (explained_variance_score, mean_absolute_error,
+                             mean_squared_error, r2_score)
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import (MaxAbsScaler, MinMaxScaler, Normalizer,
+                                   PowerTransformer, QuantileTransformer,
+                                   RobustScaler, StandardScaler)
+from sklearn.tree import DecisionTreeRegressor
+from statsmodels.distributions.empirical_distribution import ECDF
+from statsmodels.stats.diagnostic import het_breuschpagan
+from tensorflow.keras.layers import Activation, Dense, Dropout
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.optimizers import Adam
+
+# fmt: on
+
+__all__ = ["HTML_formater", "Pipeline", "Model", "PostProcessing"]
 
 
 def HTML_formater(df, name):
@@ -62,7 +50,54 @@ def HTML_formater(df, name):
         f.write(html_string.format(table=df.to_html(classes="mystyle")))
 
 
-class pipeline:
+class Pipeline:
+    """
+
+    Parameters
+    ----------
+    df : pd.Dataframe
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import rossml as rsml
+
+    Importing and collecting data
+    >>> df = pd.read_csv('seal_fake.csv')
+    >>> df_val= pd.read_csv('xllaby_data-componentes.csv')
+
+    >>> df_val.fillna(df.mean)
+    >>> D = Pipeline(df)
+    >>> D.set_features(0, 20)
+    >>> D.set_labels(20, len(D.df.columns))
+    >>> D.feature_reduction(15)
+    >>> D.data_scaling(0.1, scalers=[RobustScaler(), RobustScaler()], scaling=True)
+    >>> D.build_Sequential_ANN(4, [50, 50, 50, 50])
+    >>> model, predictions = D.model_run(batch_size=300, epochs=1000)
+
+    Get the model configurations to change it afterwards
+    >>> # model.get_config()
+    >>> D.model_history()
+    >>> D.metrics()
+
+    Post-processing data
+    >>> postproc = PostProcessing(D.train,D.test)
+    >>> postproc.plot_overall_results()
+    >>> postproc.plot_confidence_bounds(a = 0.01)
+    >>> postproc.plot_standardized_error()
+    >>> postproc.plot_qq()
+
+    Displays the HTML report
+    >>> # postproc.show()
+    >>> url = 'results'
+    >>> D.hypothesis_test()
+    >>> D.save_model('teste')
+    >>> model = Model('teste')
+    >>> model.load_model()
+    >>> X = Pipeline(df_val).set_features(0,20)
+    >>> results = model.predict(X)
+    """
+
     def __init__(self, df):
         path1 = "img"
         path2 = "tables"
@@ -73,16 +108,15 @@ class pipeline:
         self.df = df
         self.df.dropna(inplace=True)
 
-    def set_features(self, begin, end):
+    def set_features(self, start, end):
         """
-        
 
         Parameters
         ----------
-        begin : int
-            begin column of dataframe features
+        start : int
+            Start column of dataframe features
         end : TYPE
-            end column of dataframe features
+            End column of dataframe features
 
         Returns
         -------
@@ -90,20 +124,18 @@ class pipeline:
             DESCRIPTION.
 
         """
-        self.X = self.df[self.df.columns[begin:end]]
+        self.X = self.df[self.df.columns[start:end]]
         return self.X
 
-    def set_labels(self, begin, end):
+    def set_labels(self, start, end):
         """
-        
 
         Parameters
         ----------
-        begin : TYPE
-            begin column of dataframe labels
+        start : TYPE
+            Start column of dataframe labels
         end : TYPE
-            end column of dataframe labels
-
+            End column of dataframe labels
 
         Returns
         -------
@@ -111,62 +143,64 @@ class pipeline:
             DESCRIPTION.
 
         """
-        self.y = self.df[self.df.columns[begin:end]]
+        self.y = self.df[self.df.columns[start:end]]
         return self.y
 
-    def feature_reduction(self, N_top):
+    def feature_reduction(self, n):
         """
-        
 
         Parameters
         ----------
-        N_top : int
+        n : int
             Number of relevant features
 
         Returns
         -------
-        TYPE
-            Minimum number of features that satisfies N_top for each label
+        Minimum number of features that satisfies "n" for each label.
 
         """
         # define the model
         model = DecisionTreeRegressor()
+
         # fit the model
         model.fit(self.X, self.y)
+
         # get importance
         importance = model.feature_importances_
+
         # summarize feature importance
         featureScores = pd.concat(
             [pd.DataFrame(self.X.columns), pd.DataFrame(importance)], axis=1
         )
         featureScores.columns = ["Specs", "Score"]
-        self.best = featureScores.nlargest(N_top, "Score")["Specs"].values
+        self.best = featureScores.nlargest(n, "Score")["Specs"].values
         self.X = self.X[self.best]
+
         return self.X
 
     def data_scaling(self, test_size, scaling=True, scalers=[]):
         """
-        
 
         Parameters
         ----------
         test_size : float
-            percentage of data destined for testing
+            Percentage of data destined for testing.
         scalers : scikit-learn object
             scikit-learn scalers
         scaling : boolean, optional
-            Choose between scaling the data or not. The default is True.
+            Choose between scaling the data or not.
+            The default is True.
 
         Returns
         -------
-        Array
-            X_train - features destined for training.
-        Array
-             X_test -features destined for test.
-        Array
-            y_train - labels destined for training.
-        Array
-             y_test - labels destined for test.
+        X_train : array
+            Features destined for training.
+        X_test : array
+            Features destined for test.
+        y_train : array
+            Labels destined for training.
+        y_test : array
+             Labels destined for test.
 
         """
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
@@ -184,11 +218,11 @@ class pipeline:
         else:
             self.scaler1 = None
             self.scaler2 = None
+
         return self.X_train, self.X_test, self.y_train, self.y_test
 
     def build_Sequential_ANN(self, hidden, neurons, dropout_layers=[], dropout=[]):
         """
-        
 
         Parameters
         ----------
@@ -197,14 +231,15 @@ class pipeline:
         neurons : list
             Number of neurons per layer.
         dropout_layers : list, optional
-            DESCRIPTION. dropout layers position.The default is [].
+            Dropout layers position.
+            The default is [].
         dropout : list, optional
-            DESCRIPTION. list with dropout values. The default is [].
+            List with dropout values.
+            The default is [].
 
         Returns
         -------
-        keras neural network
-
+        model : keras neural network
         """
         self.model = Sequential()
         self.model.add(Dense(len(self.X.columns), activation="relu"))
@@ -216,11 +251,11 @@ class pipeline:
             self.model.add(Dense(neurons[i], activation="relu"))
         self.model.add(Dense(len(self.y.columns)))
         self.config = self.model.get_config()
+
         return self.model
 
     def model_run(self, optimizer="adam", loss="mse", batch_size=16, epochs=500):
         """
-        
 
         Parameters
         ----------
@@ -235,11 +270,8 @@ class pipeline:
 
         Returns
         -------
-        object
-            model
-        object
-            predictions
-
+        model : keras neural network
+        predictions :
         """
         self.model.compile(optimizer=optimizer, loss=loss)
         self.history = self.model.fit(
@@ -248,7 +280,7 @@ class pipeline:
             validation_data=(self.X_test, self.y_test),
             batch_size=batch_size,
             epochs=epochs,
-        )  # batch_size = 16,epochs = 500
+        )
         self.predictions = self.model.predict(self.X_test)
         self.train = pd.DataFrame(
             self.scaler2.inverse_transform(self.predictions), columns=self.y.columns
@@ -259,13 +291,10 @@ class pipeline:
         return self.model, self.predictions
 
     def model_history(self):
-        """
-        Plot model history
+        """Plot model history.
 
-        Returns
-        -------
-        None.
-
+        Examples
+        --------
         """
         hist = pd.DataFrame(
             self.history.history
@@ -286,13 +315,18 @@ class pipeline:
         )
 
     def metrics(self):
-        """
-        Print Metrics
+        """Print model metrics.
 
-        Returns
-        -------
-        None.
+        This function displays the model metrics while the neural network is being
+        built.
 
+        Prints
+        ------
+        The mean absolute error (MAE).
+        The mean squared error (MSE).
+        The coefficient of determination (R-squared).
+        The adjusted coefficient of determination (adjusted R-squared).
+        The explained variance (discrepancy between a model and actual data).
         """
         R2_a = 1 - (
             (len(self.predictions) - 1)
@@ -310,29 +344,46 @@ class pipeline:
         )
         HTML_formater(metrics, "Metrics")
         print(
-            "Scores:\nMAE: {}\nMSE: {}\nR^2:{}\nR^2 ajustado:{}\nExplained variance:{}".format(
+            "Scores:\nMAE: {}\nMSE: {}\nR^2:{}\nR^2 adjusted:{}\nExplained variance:{}".format(
                 MAE, MSE, R2, R2_a, explained_variance
             )
         )
 
-    def hypothesis_test(self, kind="Komolgorov-Smirnov", p_value=0.05):
-        """
-        
+    def hypothesis_test(self, kind="ks", p_value=0.05):
+        """Run a hypothesis test.
 
         Parameters
         ----------
         kind : string, optional
-            Hypothesis test kind. Choose between 'Welch' and K-S tests. The default is 'Komolgorov-Smirnov'.
+            Hypothesis test kind. Options are:
+                "w": Welch test
+                    Calculate the T-test for the means of two independent samples of
+                    scores. This is a two-sided test for the null hypothesis that 2
+                    independent samples have identical average (expected) values.
+                    This test assumes that the populations have identical variances by
+                    default.
+                "ks": Komolgorov-Smirnov test
+                    Compute the Kolmogorov-Smirnov statistic on 2 samples. This is a
+                    two-sided test for the null hypothesis that 2 independent samples
+                    are drawn from the same continuous distribution.
+            The default is 'ks'.
+
+            * See scipy.stats.ks_2samp and scipy.stats.ttest_ind documentation for more
+            informations.
+
         p_value : float, optional
-            Critical value.A number between 0 and 1. The default is 0.05.
+            Critical value. Must be within 0 and 1.
+            The default is 0.05.
 
         Returns
         -------
-        p_df : DataFrame
+        p_df : pd.DataFrame
             Hypothesis test results.
 
+        Examples
+        --------
         """
-        if kind == "Komolgorov-Smirnov":
+        if kind == "ks":
             p_values = np.round(
                 [
                     ks_2samp(self.train[var], self.test[var]).pvalue
@@ -348,8 +399,8 @@ class pipeline:
                 for p in p_df["p-value: train"]
             ]
             HTML_formater(p_df, "KS Test")
-        if kind == "Welch":
-            p_values3 = np.round(
+        elif kind == "w":
+            p_values = np.round(
                 [
                     ttest_ind(self.train[var], self.test[var], equal_var=False).pvalue
                     for var in self.train.columns
@@ -357,7 +408,7 @@ class pipeline:
                 3,
             )
             p_df = pd.DataFrame(
-                p_values3, index=self.train.columns, columns=["p-value: acc"]
+                p_values, index=self.train.columns, columns=["p-value: acc"]
             )
             p_df["status"] = [
                 "Not Reject H0" if p > p_value else "Reject H0"
@@ -367,20 +418,45 @@ class pipeline:
             # p_df.to_html(r'tables\Welch test.html')
         return p_df
 
-    def validation(self, X, y):
+    def validation(self, x, y):
+        """
+
+        Parameters
+        ----------
+        x : TYPE
+            DESCRIPTION.
+        y : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        train : pd.DataFrame
+            DESCRIPTION.
+        test : pd.DataFrame
+            DESCRIPTION.
+
+        """
         self.test = y
-        if self.scaler1 != None:
-            X_scaled = self.scaler1.transform(X.values.reshape(-1, len(X.columns)))
-        if self.scaler2 != None:
+        if self.scaler1 is not None:
+            X_scaled = self.scaler1.transform(x.values.reshape(-1, len(x.columns)))
+        if self.scaler2 is not None:
             self.train = pd.DataFrame(
-                self.scaler2.inverse_transform(model.predict(X_scaled)),
+                self.scaler2.inverse_transform(self.model.predict(X_scaled)),
                 columns=y.columns,
             )
         else:
-            self.train = pd.DataFrame(model.predict(X_scaled), columns=y.columns)
+            self.train = pd.DataFrame(self.model.predict(X_scaled), columns=y.columns)
         return self.train, self.test
 
     def save_model(self, name):
+        """
+
+        Parameters
+        ----------
+        name : str
+            DESCRIPTION.
+
+        """
         if not os.path.isdir(name):
             os.makedirs(name)
         self.model.save(r"{}/{}.h5".format(name, name))
@@ -442,13 +518,13 @@ class Model:
         return self.results
 
 
-class postprocessing:
+class PostProcessing:
     def __init__(self, train, test):
         self.train = train
         self.test = test
         self.test.index = self.train.index
 
-    def show_overall_results(self):
+    def plot_overall_results(self):
         df = pd.concat([self.train, self.test], axis=0)
         df["label"] = [
             "train" if x < len(self.train) else "test" for x in range(len(df))
@@ -464,9 +540,8 @@ class postprocessing:
         )
         plt.close()
 
-    def show_confidence_bounds(self, a):
-        """
-        Plot a Confidence interval based on DKW inequality
+    def plot_confidence_bounds(self, a):
+        """Plot a confidence interval based on DKW inequality
 
         Parameters
         ----------
@@ -481,7 +556,7 @@ class postprocessing:
         sns.set()
         P = np.arange(0, 100, 0.05)
         en = np.sqrt((1 / (2 * len(P))) * np.log(2 / a))
-        var = list(self.train.columns)  
+        var = list(self.train.columns)
         for v in var:
             plt.figure()
             F = ECDF(self.train[v])
@@ -511,7 +586,7 @@ class postprocessing:
             )
             plt.close()
 
-    def q_q_plot(self):
+    def plot_qq(self):
         var = list(self.train.columns)  # [0:4]
         for v in var:
             plt.figure()
@@ -519,7 +594,7 @@ class postprocessing:
                 self.test[v],
                 self.train[v],
                 color="orange",
-                label="pontos de teste - {}".format(v),
+                label="Test points - {}".format(v),
             )
             plt.plot(self.test[v], self.test[v], "b", label="$y_{teste}=y_{treino}$")
             plt.legend()
@@ -533,22 +608,25 @@ class postprocessing:
             )
             plt.close()
 
-    def standardized_error_plot(self):
-        var = list(self.train.columns)  
-        erro = self.test - self.train
-        erro = erro / erro.std()
-        erro.dropna(inplace=True)
+    def plot_standardized_error(self):
+        """Plot and save the graphic for standardized error.
+
+        Examples
+        --------
+        """
+        var = list(self.train.columns)
+        error = self.test - self.train
+        error = error / error.std()
+        error.dropna(inplace=True)
         for v in var:
             plt.figure()
             plt.scatter(
                 self.test[v],
-                erro[v],
+                error[v],
                 color="orange",
-                label="pontos de teste - {}".format(v),
+                label="Test points - {}".format(v),
             )
-            plt.axhline(
-                0, ls="--", color="blue"
-            )  
+            plt.axhline(0, ls="--", color="blue")
             plt.legend()
             plt.savefig(
                 r"img\standardized_error_{}_plot.png".format(v),
@@ -560,13 +638,16 @@ class postprocessing:
             )
             plt.close()
 
-    def residuals_resume(self):
-        erro_std = (self.test - self.train) / (self.test - self.train).std()
+    def plot_residuals_resume(self):
+        """Plot and save the graphic for residuals distribution.
+
+        Examples
+        --------
+        """
+        error_std = (self.test - self.train) / (self.test - self.train).std()
         plt.figure(figsize=(16, 9))
-        g = sns.boxenplot(
-            data=erro_std, orient="h", palette="hls"
-        ) 
-        g = sns.stripplot(data=erro_std, orient="h", palette="hls")
+        g = sns.boxenplot(data=error_std, orient="h", palette="hls")
+        g = sns.stripplot(data=error_std, orient="h", palette="hls")
         ax1 = g.axes
         ax1.axvline(0, ls="--", color="black", label=r"$\sigma$ = 0")
         ax1.axvline(1, ls="--", color="red", label=r"$\sigma$ = 1")
@@ -575,7 +656,7 @@ class postprocessing:
         ax1.axvline(-2, ls="--", color="blue")
         ax1.axvline(3, ls="--", color="green", label=r"$\sigma$ = 3")
         ax1.axvline(-3, ls="--", color="green")
-        plt.title("Distribuição dos resíduos")
+        plt.title("Residue Distribution")
         plt.xlim([-10, 10])
         plt.legend()
         plt.savefig(
@@ -588,35 +669,20 @@ class postprocessing:
         )
 
     @staticmethod
-    def show(url="results.html"):
-        return webbrowser.open(url, new=2)
+    def show(name="results"):
+        """Display the HTML report on browser.
 
+        The report contains a brief content about the neural network built.
 
-# Example:
+        Parameters
+        ----------
+        url : srt, optional
+            The report file name.
+            The default is "results".
 
-# df = pd.read_csv('seal_fake.csv')
-# df_val= pd.read_csv('xllaby_data-componentes.csv')
-# df_val.fillna(df.mean)
-# D = pipeline(df)
-# D.set_features(0,20)
-# D.set_labels(20,len(D.df.columns))
-# D.feature_reduction(15)
-# D.data_scaling(0.1,scalers = [RobustScaler(),RobustScaler()], scaling = True)
-# D.build_Sequential_ANN(4,[50,50,50,50])
-# model,predictions = D.model_run(batch_size = 300,epochs =1000)
-# #model.get_config() - Pega as configurações do modelo para alterá-lo a posteriori
-# D.model_history()
-# D.metrics()
-# postproc = postprocessing(D.train,D.test)
-# postproc.show_overall_results()
-# postproc.show_confidence_bounds(a = 0.01)
-# postproc.standardized_error_plot()
-# postproc.q_q_plot()
-# postproc.show()
-# url = 'results.html'
-# D.hypothesis_test()
-# D.save_model('teste')
-# model = Model('teste')
-# model.load_model()
-# X= pipeline(df_val).set_features(0,20)
-# results = model.predict(X)
+        Returns
+        -------
+        HTML report
+            A interactive HTML report.
+        """
+        return webbrowser.open(f"{name}.html", new=2)
