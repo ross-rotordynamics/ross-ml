@@ -11,25 +11,20 @@ from pickle import dump, load
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from keras.regularizers import l2
 from matplotlib import pyplot as plt
-from scipy.stats import (chisquare, entropy, ks_2samp, normaltest, skew,
-                         ttest_1samp, ttest_ind)
-from sklearn.decomposition import PCA
-from sklearn.feature_selection import (SelectKBest, f_regression,
-                                       mutual_info_regression)
+from scipy.stats import (ks_2samp, ttest_ind)
+
 from sklearn.metrics import (explained_variance_score, mean_absolute_error,
                              mean_squared_error, r2_score)
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import (MaxAbsScaler, MinMaxScaler, Normalizer,
-                                   PowerTransformer, QuantileTransformer,
-                                   RobustScaler, StandardScaler)
 from sklearn.tree import DecisionTreeRegressor
 from statsmodels.distributions.empirical_distribution import ECDF
-from statsmodels.stats.diagnostic import het_breuschpagan
-from tensorflow.keras.layers import Activation, Dense, Dropout
+from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.optimizers import Adam
+
+from plotly import graph_objects as go
+from plotly.subplots import make_subplots
+from plotly.figure_factory import create_scatterplotmatrix
 
 # fmt: on
 
@@ -178,7 +173,7 @@ class Pipeline:
 
         return self.X
 
-    def data_scaling(self, test_size, scaling=True, scalers=[]):
+    def data_scaling(self, test_size, scaling=True, scalers=None):
         """
 
         Parameters
@@ -193,9 +188,9 @@ class Pipeline:
 
         Returns
         -------
-        X_train : array
+        x_train : array
             Features destined for training.
-        X_test : array
+        x_test : array
             Features destined for test.
         y_train : array
             Labels destined for training.
@@ -203,14 +198,17 @@ class Pipeline:
              Labels destined for test.
 
         """
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+        if scalers is None:
+            scalers = []
+
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
             self.X, self.y, test_size=test_size
         )
         if scaling:
             if len(scalers) >= 1:
                 self.scaler1 = scalers[0]
-                self.X_train = self.scaler1.fit_transform(self.X_train)
-                self.X_test = self.scaler1.transform(self.X_test)
+                self.x_train = self.scaler1.fit_transform(self.x_train)
+                self.x_test = self.scaler1.transform(self.x_test)
                 if len(scalers) == 2:
                     self.scaler2 = scalers[1]
                     self.y_train = self.scaler2.fit_transform(self.y_train)
@@ -219,7 +217,7 @@ class Pipeline:
             self.scaler1 = None
             self.scaler2 = None
 
-        return self.X_train, self.X_test, self.y_train, self.y_test
+        return self.x_train, self.x_test, self.y_train, self.y_test
 
     def build_Sequential_ANN(self, hidden, neurons, dropout_layers=[], dropout=[]):
         """
@@ -241,6 +239,11 @@ class Pipeline:
         -------
         model : keras neural network
         """
+        if dropout_layers is None:
+            dropout_layers = []
+        if dropout is None:
+            dropout = []
+
         self.model = Sequential()
         self.model.add(Dense(len(self.X.columns), activation="relu"))
         j = 0  # Dropout counter
@@ -275,13 +278,13 @@ class Pipeline:
         """
         self.model.compile(optimizer=optimizer, loss=loss)
         self.history = self.model.fit(
-            x=self.X_train,
+            x=self.x_train,
             y=self.y_train,
-            validation_data=(self.X_test, self.y_test),
+            validation_data=(self.x_test, self.y_test),
             batch_size=batch_size,
             epochs=epochs,
         )
-        self.predictions = self.model.predict(self.X_test)
+        self.predictions = self.model.predict(self.x_test)
         self.train = pd.DataFrame(
             self.scaler2.inverse_transform(self.predictions), columns=self.y.columns
         )
@@ -297,22 +300,56 @@ class Pipeline:
         --------
         """
         hist = pd.DataFrame(
-            self.history.history
-        )  # hist = pd.DataFrame(self.model.history.history)
-        plt.plot(np.log10(hist["loss"]), label="loss")
-        plt.plot(np.log10(hist["val_loss"]), label="val_loss")
-        plt.xlabel("Epoch")
-        plt.ylabel("$log_{10}(Perda)$")
-        plt.title("Loss Function")
-        plt.legend()
-        plt.savefig(
-            "img\history.png",
-            dpi=1000,
-            facecolor="w",
-            edgecolor="k",
-            orientation="portrait",
-            format="png",
+            self.D.history.history
         )
+        axes_default = dict(
+            gridcolor="lightgray",
+            showline=True,
+            linewidth=1.5,
+            linecolor="black",
+            mirror=True,
+            exponentformat="none",
+        )
+
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatter(
+                x=list(range(hist["loss"].size)),
+                y=np.log10(hist["loss"]),
+                mode="lines",
+                line=dict(color="blue"),
+                name="Loss",
+                legendgroup="Loss",
+                hoverinfo="none",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=list(range(hist["val_loss"].size)),
+                y=np.log10(hist["val_loss"]),
+                mode="lines",
+                line=dict(color="orange"),
+                name="Val_loss",
+                legendgroup="Val_loss",
+                hoverinfo="none",
+            )
+        )
+
+        fig.update_xaxes(
+            title=dict(text="Epoch", font=dict(size=15)), **axes_default,
+        )
+        fig.update_yaxes(
+            title=dict(text="Log<sub>10</sub>Loss", font=dict(size=15)), **axes_default,
+        )
+        fig.update_layout(
+            plot_bgcolor="white",
+            legend=dict(bgcolor="white", bordercolor="black", borderwidth=1,),
+        )
+        fig.write_html(r"img\history.html")
+
+        return fig
+
 
     def metrics(self):
         """Print model metrics.
@@ -524,165 +561,403 @@ class PostProcessing:
         self.test = test
         self.test.index = self.train.index
 
-    def plot_overall_results(self):
+    def plot_overall_results(self, save_fig=False):
+        """
+
+        Parameters
+        ----------
+        save_fig : bool, optional
+            If save_fig is True, saves the result in img folder. If False, does not
+            save. The default is True.
+
+        Returns
+        -------
+        fig : Plotly graph_objects.Figure()
+            The figure object with the plot.
+        """
         df = pd.concat([self.train, self.test], axis=0)
         df["label"] = [
             "train" if x < len(self.train) else "test" for x in range(len(df))
         ]
-        sns.pairplot(df, hue="label")
-        plt.savefig(
-            r"img\pairplot.png",
-            dpi=1000,
-            facecolor="w",
-            edgecolor="k",
-            orientation="portrait",
-            format="png",
+        axes_default = dict(
+            gridcolor="lightgray",
+            showline=True,
+            linewidth=1.5,
+            linecolor="black",
+            mirror=True,
+            exponentformat="power",
+            zerolinecolor="lightgray",
         )
-        plt.close()
 
-    def plot_confidence_bounds(self, a):
-        """Plot a confidence interval based on DKW inequality
+        fig = create_scatterplotmatrix(
+            df, diag="box", index="label", title="",
+        )
+        fig.update_layout(
+            width=1500,
+            height=1500,
+            plot_bgcolor="white",
+            hovermode=False,
+        )
+        fig.update_xaxes(**axes_default)
+        fig.update_yaxes(**axes_default)
+
+        if save_fig:
+            fig.write_html(r"img\pairplot.html")
+
+        return fig
+
+    def plot_confidence_bounds(self, a=0.01, percentile=0.05, save_fig=False):
+        """Plot a confidence interval based on DKW inequality.
 
         Parameters
         ----------
         a : float
             Significance level.A number between 0 and 1.
+        percentile : float, optional
+            Percentile to compute, which must be between 0 and 100 inclusive.
+        save_fig : bool, optional
+            If save_fig is True, saves the result in img folder. If False, does not
+            save. The default is True.
 
         Returns
         -------
-        None.
-
+        figures : list
+            List of figures plotting DKW inequality for each variable in dataframe.
         """
-        sns.set()
-        P = np.arange(0, 100, 0.05)
+        P = np.arange(0, 100, percentile)
         en = np.sqrt((1 / (2 * len(P))) * np.log(2 / a))
         var = list(self.train.columns)
+
+        axes_default = dict(
+            gridcolor="lightgray",
+            showline=True,
+            linewidth=1.5,
+            linecolor="black",
+            mirror=True,
+            exponentformat="power",
+        )
+
+        figures = []
         for v in var:
-            plt.figure()
             F = ECDF(self.train[v])
             G = ECDF(self.test[v])
             Gu = [min(Gn + en, 1) for Gn in G.y]
             Gl = [max(Gn - en, 0) for Gn in G.y]
-            plt.plot(G.x, Gu, label="{} - 95% CI".format(v), ls="--", color="black")
-            plt.plot(G.x, Gl, ls="--", color="black")
-            plt.plot(G.x, G.y, label=" test {}".format(v), ls="-")
-            plt.plot(
-                F.x,
-                F.y,
-                label="train {}".format(v),
-                ls=":",
-                linewidth=2,
-                color="magenta",
-            )
-            plt.legend()
-            plt.xscale("symlog")
-            plt.savefig(
-                r"img\CI_{}.png".format(v),
-                dpi=1000,
-                facecolor="w",
-                edgecolor="k",
-                orientation="portrait",
-                format="png",
-            )
-            plt.close()
 
-    def plot_qq(self):
-        var = list(self.train.columns)  # [0:4]
+            fig = go.Figure()
+
+            fig.add_trace(
+                go.Scatter(
+                    x=np.concatenate((G.x, G.x[::-1])),
+                    y=np.concatenate((Gl, Gu[::-1])),
+                    mode="lines",
+                    line=dict(color="lightblue"),
+                    fill="toself",
+                    fillcolor="lightblue",
+                    opacity=0.6,
+                    name=f"{v} - {100 * (1 - percentile)}% Confidence Interval",
+                    legendgroup=f"CI - {v}",
+                    hoverinfo="none",
+                )
+            )
+
+            fig.add_trace(
+                go.Scatter(
+                    x=G.x,
+                    y=G.y,
+                    mode="lines",
+                    line=dict(color="darkblue", dash="dash"),
+                    name=f"test {v}",
+                    legendgroup=f"test {v}",
+                    hoverinfo="none",
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=F.x,
+                    y=F.y,
+                    mode="lines",
+                    line=dict(color="magenta", width=2.0, dash="dot"),
+                    name=f"test {v}",
+                    legendgroup=f"train {v}",
+                    hoverinfo="none",
+                )
+            )
+
+            fig.update_xaxes(
+                title=dict(text=f"{v}", font=dict(size=15)), **axes_default,
+            )
+            fig.update_yaxes(
+                title=dict(text="Cumulative Distribution Function", font=dict(size=15)),
+                **axes_default,
+            )
+            fig.update_layout(
+                plot_bgcolor="white",
+                legend=dict(bgcolor="white", bordercolor="black", borderwidth=1,),
+            )
+            figures.append(fig)
+
+            if save_fig:
+                fig.write_html(r"img\CI_{}.html".format(v))
+
+        return figures
+
+    def plot_qq(self, save_fig=False):
+        """
+
+        Parameters
+        ----------
+        save_fig : bool, optional
+            If save_fig is True, saves the result in img folder. If False, does not
+            save. The default is True.
+
+        Returns
+        -------
+        figures : list
+            List of figures plotting quantile-quantile for each variable in dataframe.
+        """
+        axes_default = dict(
+            gridcolor="lightgray",
+            showline=True,
+            linewidth=1.5,
+            linecolor="black",
+            mirror=True,
+            exponentformat="power",
+        )
+
+        figures = []
+        var = list(self.train.columns)
         for v in var:
-            plt.figure()
-            plt.scatter(
-                self.test[v],
-                self.train[v],
-                color="orange",
-                label="Test points - {}".format(v),
-            )
-            plt.plot(self.test[v], self.test[v], "b", label="$y_{teste}=y_{treino}$")
-            plt.legend()
-            plt.savefig(
-                r"img\qq_plot_{}.png".format(v),
-                dpi=1000,
-                facecolor="w",
-                edgecolor="k",
-                orientation="portrait",
-                format="png",
-            )
-            plt.close()
+            fig = go.Figure()
 
-    def plot_standardized_error(self):
+            fig.add_trace(
+                go.Scatter(
+                    x=self.test[v],
+                    y=self.train[v],
+                    mode="markers",
+                    marker=dict(size=8, color="orange"),
+                    name=f"Test points - {v}",
+                    legendgroup=f"Test points - {v}",
+                    hovertemplate=(
+                        f"{v}<sub>test</sub> : %{{x:.2f}}<br>{v}<sub>train</sub> : %{{y:.2f}}"
+                    ),
+                )
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=self.test[v],
+                    y=self.test[v],
+                    mode="lines",
+                    line=dict(color="blue", dash="dash"),
+                    name="Y<sub>test</sub> = Y<sub>train</sub>",
+                    legendgroup="test_test",
+                    hoverinfo="none",
+                )
+            )
+
+            fig.update_xaxes(
+                title=dict(text=f"{v} <sub>test</sub>", font=dict(size=15)),
+                **axes_default,
+            )
+            fig.update_yaxes(
+                title=dict(text=f"{v} <sub>train</sub>", font=dict(size=15)),
+                **axes_default,
+            )
+            fig.update_layout(
+                plot_bgcolor="white",
+                legend=dict(bgcolor="white", bordercolor="black", borderwidth=1,),
+            )
+            figures.append(fig)
+
+            if save_fig:
+                fig.write_html(r"img\qq_plot_{}.html".format(v))
+
+        return figures
+
+    def plot_standardized_error(self, save_fig=False):
         """Plot and save the graphic for standardized error.
 
-        Examples
-        --------
+        Parameters
+        ----------
+        save_fig : bool, optional
+            If save_fig is True, saves the result in img folder. If False, does not
+            save. The default is False.
+
+        Returns
+        -------
+        figures : list
+            List of figures plotting standardized error for each variable in dataframe.
         """
         var = list(self.train.columns)
         error = self.test - self.train
         error = error / error.std()
         error.dropna(inplace=True)
-        for v in var:
-            plt.figure()
-            plt.scatter(
-                self.test[v],
-                error[v],
-                color="orange",
-                label="Test points - {}".format(v),
-            )
-            plt.axhline(0, ls="--", color="blue")
-            plt.legend()
-            plt.savefig(
-                r"img\standardized_error_{}_plot.png".format(v),
-                dpi=1000,
-                facecolor="w",
-                edgecolor="k",
-                orientation="portrait",
-                format="png",
-            )
-            plt.close()
-
-    def plot_residuals_resume(self):
-        """Plot and save the graphic for residuals distribution.
-
-        Examples
-        --------
-        """
-        error_std = (self.test - self.train) / (self.test - self.train).std()
-        plt.figure(figsize=(16, 9))
-        g = sns.boxenplot(data=error_std, orient="h", palette="hls")
-        g = sns.stripplot(data=error_std, orient="h", palette="hls")
-        ax1 = g.axes
-        ax1.axvline(0, ls="--", color="black", label=r"$\sigma$ = 0")
-        ax1.axvline(1, ls="--", color="red", label=r"$\sigma$ = 1")
-        ax1.axvline(-1, ls="--", color="red")
-        ax1.axvline(2, ls="--", color="blue", label=r"$\sigma$ = 2")
-        ax1.axvline(-2, ls="--", color="blue")
-        ax1.axvline(3, ls="--", color="green", label=r"$\sigma$ = 3")
-        ax1.axvline(-3, ls="--", color="green")
-        plt.title("Residue Distribution")
-        plt.xlim([-10, 10])
-        plt.legend()
-        plt.savefig(
-            "img\residuals_resume.png",
-            dpi=1000,
-            facecolor="w",
-            edgecolor="k",
-            orientation="portrait",
-            format="png",
+        axes_default = dict(
+            gridcolor="lightgray",
+            showline=True,
+            linewidth=1.5,
+            linecolor="black",
+            mirror=True,
+            exponentformat="power",
         )
 
-    @staticmethod
-    def show(name="results"):
+        figures = []
+        for v in var:
+            error = self.test[v] - self.train[v]
+            fig = go.Figure()
+
+            fig.add_trace(
+                go.Scatter(
+                    x=self.test[v],
+                    y=error[v],
+                    mode="markers",
+                    marker=dict(size=8, color="orange"),
+                    name=f"Test points - {v}",
+                    legendgroup=f"Test points - {v}",
+                    showlegend=True,
+                    hovertemplate=(
+                        f"{v}<sub>test</sub> : %{{x:.2f}}<br>error : %{{y:.2f}}"
+                    ),
+                )
+            )
+
+            fig.update_xaxes(
+                title=dict(text=f"{v} <sub>test</sub>", font=dict(size=15)),
+                **axes_default,
+            )
+            fig.update_yaxes(
+                title=dict(text=f"Standardized Error", font=dict(size=15)),
+                **axes_default,
+            )
+            fig.update_layout(
+                plot_bgcolor="white",
+                legend=dict(bgcolor="white", bordercolor="black", borderwidth=1,),
+                shapes=[
+                    dict(
+                        type="line",
+                        xref="paper",
+                        x0=0,
+                        x1=1,
+                        yref="y",
+                        y0=0,
+                        y1=0,
+                        line=dict(color="blue", dash="dash"),
+                    )
+                ],
+            )
+            figures.append(fig)
+
+            if save_fig:
+                fig.write_html(r"img\standardized_error_{}_plot.html".format(v))
+
+        return figures
+
+    def plot_residuals_resume(self, save_fig=False):
+        """Plot and save the graphic for residuals distribution.
+
+        Parameters
+        ----------
+        save_fig : bool, optional
+            If save_fig is True, saves the result in img folder. If False, does not
+            save. The default is False.
+
+        Returns
+        -------
+        fig : Plotly graph_objects.Figure()
+            The figure object with the plot.
+        """
+        N = self.train.shape[1]
+        colors = [
+            "hsl(" + str(h) + ",50%" + ",50%)" for h in np.linspace(0, 360, N + 1)
+        ]
+        error_std = (self.test - self.train) / (self.test - self.train).std()
+        labels = list(self.train.columns)
+
+        axes_default = dict(
+            gridcolor="lightgray",
+            showline=True,
+            linewidth=1.5,
+            linecolor="black",
+            mirror=True,
+            exponentformat="power",
+        )
+
+        fig = go.Figure(
+            data=[
+                go.Box(
+                    x=error_std[labels[i]],
+                    marker_color=colors[i],
+                    jitter=0.2,
+                    pointpos=0,
+                    boxpoints="all",
+                    name=labels[i],
+                    hoverinfo="none",
+                    orientation="h",
+                )
+                for i in range(N)
+            ]
+        )
+        fig.update_xaxes(
+            title=dict(text="Standard Deviation", font=dict(size=15)),
+            range=[-10, 10],
+            tickvals=[-10, -5, -3, -2, -1, 0, 1, 2, 3, 5, 10],
+            tickmode="array",
+            **axes_default,
+        )
+        fig.update_yaxes(**axes_default)
+
+        n = 7
+        shape_x = np.linspace(-3, 3, n)
+        shape_color = ["green", "blue", "red", "black", "red", "blue", "green"]
+        fig.update_layout(
+            plot_bgcolor="white",
+            legend=dict(bgcolor="white", bordercolor="black", borderwidth=1),
+            shapes=[
+                dict(
+                    type="line",
+                    xref="x",
+                    x0=shape_x[i],
+                    x1=shape_x[i],
+                    yref="paper",
+                    y0=0,
+                    y1=1,
+                    line=dict(color=shape_color[i], dash="dash"),
+                    name=f"σ = {abs(shape_x[i])}",
+                )
+                for i in range(n)
+            ],
+        )
+
+        if save_fig:
+            fig.write_html(r"img\residuals_resume.html")
+
+        return fig
+
+    def show(self, name="results", **kwargs):
         """Display the HTML report on browser.
 
         The report contains a brief content about the neural network built.
 
         Parameters
         ----------
-        url : srt, optional
+        name : srt, optional
             The report file name.
             The default is "results".
+        kwargs : optional inputs to plot the confidence bounds.
+            a : float
+                Significance level.A number between 0 and 1.
+            percentile : float, optional
+                Percentile to compute, which must be between 0 and 100 inclusive.
 
         Returns
         -------
         HTML report
             A interactive HTML report.
         """
+        _ = self.plot_overall_results(save_fig=True)
+        _ = self.plot_confidence_bounds(a, percentilve, save_fig=True)
+        _ = self.plot_qq(save_fig=True)
+        _ = self.plot_standardized_error(save_fig=True)
+        _ = self.plot_residuals_resume(save_fig=True)
+
         return webbrowser.open(f"{name}.html", new=2)
