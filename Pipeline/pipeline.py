@@ -4,27 +4,33 @@ ROSS-ML is a module to create neural networks aimed at calculating rotodynamic
 coefficients for bearings and seals.
 """
 # fmt: off
-import os
 import webbrowser
+from pathlib import Path
 from pickle import dump, load
 
 import numpy as np
 import pandas as pd
-import seaborn as sns
-from matplotlib import pyplot as plt
-from scipy.stats import (ks_2samp, ttest_ind)
-
+from keras.regularizers import l2
+from plotly import graph_objects as go
+from plotly.figure_factory import create_scatterplotmatrix
+from plotly.subplots import make_subplots
+from scipy.stats import (chisquare, entropy, ks_2samp, normaltest, skew,
+                         ttest_1samp, ttest_ind)
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import (SelectKBest, f_regression,
+                                       mutual_info_regression)
 from sklearn.metrics import (explained_variance_score, mean_absolute_error,
                              mean_squared_error, r2_score)
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import (MaxAbsScaler, MinMaxScaler, Normalizer,
+                                   PowerTransformer, QuantileTransformer,
+                                   RobustScaler, StandardScaler)
 from sklearn.tree import DecisionTreeRegressor
 from statsmodels.distributions.empirical_distribution import ECDF
-from tensorflow.keras.layers import Dense, Dropout
+from statsmodels.stats.diagnostic import het_breuschpagan
+from tensorflow.keras.layers import Activation, Dense, Dropout
 from tensorflow.keras.models import Sequential, load_model
-
-from plotly import graph_objects as go
-from plotly.subplots import make_subplots
-from plotly.figure_factory import create_scatterplotmatrix
+from tensorflow.keras.optimizers import Adam
 
 # fmt: on
 
@@ -32,6 +38,17 @@ __all__ = ["HTML_formater", "Pipeline", "Model", "PostProcessing"]
 
 
 def HTML_formater(df, name):
+    """
+
+    Parameters
+    ----------
+    df : TYPE
+        DESCRIPTION.
+    name : TYPE
+        DESCRIPTION.
+
+    """
+    path = Path(__file__).parent
     html_string = """
                     <html>
                     <head><title>HTML Pandas Dataframe with CSS</title></head>
@@ -41,11 +58,11 @@ def HTML_formater(df, name):
                    </body>
                     </html>.
                """
-    with open("tables/{}.html".format(name), "w") as f:
+    with open(path / "tables/{}.html".format(name), "w") as f:
         f.write(html_string.format(table=df.to_html(classes="mystyle")))
 
 
-class Pipeline:
+class Pipeline(object):
     """
 
     Parameters
@@ -60,8 +77,8 @@ class Pipeline:
     Importing and collecting data
     >>> df = pd.read_csv('seal_fake.csv')
     >>> df_val= pd.read_csv('xllaby_data-componentes.csv')
-
     >>> df_val.fillna(df.mean)
+
     >>> D = Pipeline(df)
     >>> D.set_features(0, 20)
     >>> D.set_labels(20, len(D.df.columns))
@@ -77,10 +94,10 @@ class Pipeline:
 
     Post-processing data
     >>> postproc = PostProcessing(D.train,D.test)
-    >>> postproc.plot_overall_results()
-    >>> postproc.plot_confidence_bounds(a = 0.01)
-    >>> postproc.plot_standardized_error()
-    >>> postproc.plot_qq()
+    >>> fig = postproc.plot_overall_results()
+    >>> fig = postproc.plot_confidence_bounds(a = 0.01)
+    >>> fig = postproc.plot_standardized_error()
+    >>> fig = postproc.plot_qq()
 
     Displays the HTML report
     >>> # postproc.show()
@@ -94,12 +111,13 @@ class Pipeline:
     """
 
     def __init__(self, df):
-        path1 = "img"
-        path2 = "tables"
-        if not os.path.isdir(path1):
-            os.makedirs(path1)
-        if not os.path.isdir(path2):
-            os.makedirs(path2)
+        path1 = Path(__file__).parent / "img"
+        path2 = Path(__file__).parent / "tables"
+        if not path1.exists():
+            path1.mkdir()
+        if not path2.exists():
+            path2.mkdir()
+
         self.df = df
         self.df.dropna(inplace=True)
 
@@ -173,36 +191,34 @@ class Pipeline:
 
         return self.X
 
-    def data_scaling(self, test_size, scaling=True, scalers=None):
+    def data_scaling(self, test_size, scaling=True, scalers=[]):
         """
+
 
         Parameters
         ----------
         test_size : float
             Percentage of data destined for testing.
         scalers : scikit-learn object
-            scikit-learn scalers
+            scikit-learn scalers.
         scaling : boolean, optional
             Choose between scaling the data or not.
             The default is True.
 
         Returns
         -------
-        x_train : array
-            Features destined for training.
-        x_test : array
-            Features destined for test.
-        y_train : array
-            Labels destined for training.
-        y_test : array
-             Labels destined for test.
+        Array
+            x_train - features destined for training.
+        Array
+             x_test -features destined for test.
+        Array
+            y_train - labels destined for training.
+        Array
+            y_test - labels destined for test.
 
         """
-        if scalers is None:
-            scalers = []
-
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
-            self.X, self.y, test_size=test_size
+            self.x, self.y, test_size=test_size
         )
         if scaling:
             if len(scalers) >= 1:
@@ -219,7 +235,7 @@ class Pipeline:
 
         return self.x_train, self.x_test, self.y_train, self.y_test
 
-    def build_Sequential_ANN(self, hidden, neurons, dropout_layers=[], dropout=[]):
+    def build_Sequential_ANN(self, hidden, neurons, dropout_layers=None, dropout=None):
         """
 
         Parameters
@@ -245,7 +261,7 @@ class Pipeline:
             dropout = []
 
         self.model = Sequential()
-        self.model.add(Dense(len(self.X.columns), activation="relu"))
+        self.model.add(Dense(len(self.x.columns), activation="relu"))
         j = 0  # Dropout counter
         for i in range(hidden):
             if i in dropout_layers:
@@ -299,9 +315,9 @@ class Pipeline:
         Examples
         --------
         """
-        hist = pd.DataFrame(
-            self.D.history.history
-        )
+        path = Path(__file__).parent
+
+        hist = pd.DataFrame(self.history.history)
         axes_default = dict(
             gridcolor="lightgray",
             showline=True,
@@ -337,19 +353,24 @@ class Pipeline:
         )
 
         fig.update_xaxes(
-            title=dict(text="Epoch", font=dict(size=15)), **axes_default,
+            title=dict(text="Epoch", font=dict(size=15)),
+            **axes_default,
         )
         fig.update_yaxes(
-            title=dict(text="Log<sub>10</sub>Loss", font=dict(size=15)), **axes_default,
+            title=dict(text="Log<sub>10</sub>Loss", font=dict(size=15)),
+            **axes_default,
         )
         fig.update_layout(
             plot_bgcolor="white",
-            legend=dict(bgcolor="white", bordercolor="black", borderwidth=1,),
+            legend=dict(
+                bgcolor="white",
+                bordercolor="black",
+                borderwidth=1,
+            ),
         )
-        fig.write_html(r"img\history.html")
+        fig.write_html(str(path / r"img\history.html"))
 
         return fig
-
 
     def metrics(self):
         """Print model metrics.
@@ -404,10 +425,8 @@ class Pipeline:
                     two-sided test for the null hypothesis that 2 independent samples
                     are drawn from the same continuous distribution.
             The default is 'ks'.
-
             * See scipy.stats.ks_2samp and scipy.stats.ttest_ind documentation for more
             informations.
-
         p_value : float, optional
             Critical value. Must be within 0 and 1.
             The default is 0.05.
@@ -436,6 +455,7 @@ class Pipeline:
                 for p in p_df["p-value: train"]
             ]
             HTML_formater(p_df, "KS Test")
+
         elif kind == "w":
             p_values = np.round(
                 [
@@ -452,7 +472,7 @@ class Pipeline:
                 for p in p_df["p-value: acc"]
             ]
             HTML_formater(p_df, "Welch Test")
-            # p_df.to_html(r'tables\Welch test.html')
+
         return p_df
 
     def validation(self, x, y):
@@ -475,84 +495,122 @@ class Pipeline:
         """
         self.test = y
         if self.scaler1 is not None:
-            X_scaled = self.scaler1.transform(x.values.reshape(-1, len(x.columns)))
+            x_scaled = self.scaler1.transform(x.values.reshape(-1, len(x.columns)))
         if self.scaler2 is not None:
             self.train = pd.DataFrame(
-                self.scaler2.inverse_transform(self.model.predict(X_scaled)),
+                self.scaler2.inverse_transform(self.model.predict(x_scaled)),
                 columns=y.columns,
             )
         else:
-            self.train = pd.DataFrame(self.model.predict(X_scaled), columns=y.columns)
+            self.train = pd.DataFrame(self.model.predict(x_scaled), columns=y.columns)
+
         return self.train, self.test
 
     def save_model(self, name):
-        """
+        """Save a neural netowork model.
 
         Parameters
         ----------
         name : str
-            DESCRIPTION.
+            The folder's name where the model will be saved
 
+        Examples
+        --------
         """
-        if not os.path.isdir(name):
-            os.makedirs(name)
-        self.model.save(r"{}/{}.h5".format(name, name))
-        dump(self.y.columns, open(r"{}/{}_columns.pkl".format(name, name), "wb"))
-        dump(self.best, open(r"{}/{}_best_features.pkl".format(name, name), "wb"))
-        if self.scaler1 != None:
-            dump(self.scaler1, open(r"{}/{}_scaler1.pkl".format(name, name), "wb"))
-        if self.scaler2 != None:
-            dump(self.scaler2, open(r"{}/{}_scaler2.pkl".format(name, name), "wb"))
+        path = Path(__file__).parent / name
+        if not path.exists():
+            path.mkdir()
+
+        self.model.save(path / r"{}.h5".format(name, name))
+        dump(self.y.columns, open(path / r"{}_columns.pkl".format(name), "wb"))
+        dump(self.best, open(path / r"{}_best_features.pkl".format(name), "wb"))
+        dump(self.x.columns, open(path / r"{}_features.pkl".format(name), "wb"))
+        if self.scaler1 is not None:
+            dump(self.scaler1, open(path / r"{}_scaler1.pkl".format(name), "wb"))
+        if self.scaler2 is not None:
+            dump(self.scaler2, open(path / r"{}_scaler2.pkl".format(name), "wb"))
 
 
-class Model:
+class Model(object):
     def __init__(self, name):
         self.name = name
 
     def load_model(self):
-        self.model = load_model(r"{}/{}.h5".format(self.name, self.name))
-        self.columns = load(
-            open(r"{}/{}_columns.pkl".format(self.name, self.name), "rb")
-        )
+        """Load a neural netowork model from rossml folder.
+
+        Examples
+        --------
+        """
+        path = Path(__file__).parent / self.name
+        self.model = load_model(path / r"{}.h5".format(self.name))
+        self.columns = load(open(path / r"{}_columns.pkl".format(self.name), "rb"))
+
         # load best features
         try:
             self.best = load(
-                open(r"{}/{}_best_features.pkl".format(self.name, self.name), "rb")
+                open(path / r"{}_best_features.pkl".format(self.name), "rb")
             )
         except:
             self.best = None
+
         # load the scaler
         try:
-            self.scaler1 = load(
-                open(r"{}/{}_scaler1.pkl".format(self.name, self.name), "rb")
-            )
+            self.scaler1 = load(open(path / r"{}_scaler1.pkl".format(self.name), "rb"))
         except:
             self.scaler1 = None
+
         try:
-            self.scaler2 = load(
-                open(r"{}/{}_scaler2.pkl".format(self.name, self.name), "rb")
-            )
+            self.scaler2 = load(open(path / r"{}_scaler2.pkl".format(self.name), "rb"))
         except:
             self.scaler2 = None
-        # return self.model
 
-    def predict(self, X):
+    def predict(self, x):
+        """
+
+
+        Parameters
+        ----------
+        x : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        """
+
         if self.best is None:
-            self.X = X
+            self.x = x
         else:
-            self.X = X[self.best]
-        if self.scaler1 != None:
-            self.X = self.scaler1.transform(self.X)
+            self.x = x[self.best]
+
+        if len(self.x.shape) == 1:
+            self.x = self.x.values.reshape(1, -1)
+
+        if self.scaler1 is not None:
+            self.x = self.scaler1.transform(self.x)
         else:
-            self.X = X
-        if self.scaler2 != None:
-            predictions = self.model.predict(self.X)
+            self.x = x
+
+        if self.scaler2 is not None:
+            predictions = self.model.predict(self.x)
             self.results = pd.DataFrame(
                 self.scaler2.inverse_transform(predictions), columns=self.columns
             )
         else:
             self.results = pd.DataFrame(predictions, columns=self.columns)
+
         return self.results
+
+    def coefficients(self):
+        self.K = []
+        self.C = []
+        for results in self.results.values:
+            self.K.append(results[0:4].reshape(2, 2))
+            self.C.append(results[4:].reshape(2, 2))
+
+        return self.K, self.C
 
 
 class PostProcessing:
@@ -575,6 +633,7 @@ class PostProcessing:
         fig : Plotly graph_objects.Figure()
             The figure object with the plot.
         """
+        path = Path(__file__).parent
         df = pd.concat([self.train, self.test], axis=0)
         df["label"] = [
             "train" if x < len(self.train) else "test" for x in range(len(df))
@@ -590,7 +649,10 @@ class PostProcessing:
         )
 
         fig = create_scatterplotmatrix(
-            df, diag="box", index="label", title="",
+            df,
+            diag="box",
+            index="label",
+            title="",
         )
         fig.update_layout(
             width=1500,
@@ -602,7 +664,7 @@ class PostProcessing:
         fig.update_yaxes(**axes_default)
 
         if save_fig:
-            fig.write_html(r"img\pairplot.html")
+            fig.write_html(str(path / r"img\pairplot.html"))
 
         return fig
 
@@ -624,6 +686,7 @@ class PostProcessing:
         figures : list
             List of figures plotting DKW inequality for each variable in dataframe.
         """
+        path = Path(__file__).parent
         P = np.arange(0, 100, percentile)
         en = np.sqrt((1 / (2 * len(P))) * np.log(2 / a))
         var = list(self.train.columns)
@@ -685,7 +748,8 @@ class PostProcessing:
             )
 
             fig.update_xaxes(
-                title=dict(text=f"{v}", font=dict(size=15)), **axes_default,
+                title=dict(text=f"{v}", font=dict(size=15)),
+                **axes_default,
             )
             fig.update_yaxes(
                 title=dict(text="Cumulative Distribution Function", font=dict(size=15)),
@@ -693,12 +757,16 @@ class PostProcessing:
             )
             fig.update_layout(
                 plot_bgcolor="white",
-                legend=dict(bgcolor="white", bordercolor="black", borderwidth=1,),
+                legend=dict(
+                    bgcolor="white",
+                    bordercolor="black",
+                    borderwidth=1,
+                ),
             )
             figures.append(fig)
 
             if save_fig:
-                fig.write_html(r"img\CI_{}.html".format(v))
+                fig.write_html(str(path / r"img\CI_{}.html".format(v)))
 
         return figures
 
@@ -716,6 +784,7 @@ class PostProcessing:
         figures : list
             List of figures plotting quantile-quantile for each variable in dataframe.
         """
+        path = Path(__file__).parent
         axes_default = dict(
             gridcolor="lightgray",
             showline=True,
@@ -765,12 +834,16 @@ class PostProcessing:
             )
             fig.update_layout(
                 plot_bgcolor="white",
-                legend=dict(bgcolor="white", bordercolor="black", borderwidth=1,),
+                legend=dict(
+                    bgcolor="white",
+                    bordercolor="black",
+                    borderwidth=1,
+                ),
             )
             figures.append(fig)
 
             if save_fig:
-                fig.write_html(r"img\qq_plot_{}.html".format(v))
+                fig.write_html(str(path / r"img\qq_plot_{}.html".format(v)))
 
         return figures
 
@@ -788,6 +861,7 @@ class PostProcessing:
         figures : list
             List of figures plotting standardized error for each variable in dataframe.
         """
+        path = Path(__file__).parent
         var = list(self.train.columns)
         error = self.test - self.train
         error = error / error.std()
@@ -809,7 +883,7 @@ class PostProcessing:
             fig.add_trace(
                 go.Scatter(
                     x=self.test[v],
-                    y=error[v],
+                    y=error,
                     mode="markers",
                     marker=dict(size=8, color="orange"),
                     name=f"Test points - {v}",
@@ -831,7 +905,11 @@ class PostProcessing:
             )
             fig.update_layout(
                 plot_bgcolor="white",
-                legend=dict(bgcolor="white", bordercolor="black", borderwidth=1,),
+                legend=dict(
+                    bgcolor="white",
+                    bordercolor="black",
+                    borderwidth=1,
+                ),
                 shapes=[
                     dict(
                         type="line",
@@ -848,7 +926,9 @@ class PostProcessing:
             figures.append(fig)
 
             if save_fig:
-                fig.write_html(r"img\standardized_error_{}_plot.html".format(v))
+                fig.write_html(
+                    str(path / r"img\standardized_error_{}_plot.html".format(v))
+                )
 
         return figures
 
@@ -866,6 +946,7 @@ class PostProcessing:
         fig : Plotly graph_objects.Figure()
             The figure object with the plot.
         """
+        path = Path(__file__).parent
         N = self.train.shape[1]
         colors = [
             "hsl(" + str(h) + ",50%" + ",50%)" for h in np.linspace(0, 360, N + 1)
@@ -929,7 +1010,7 @@ class PostProcessing:
         )
 
         if save_fig:
-            fig.write_html(r"img\residuals_resume.html")
+            fig.write_html(str(path / r"img\residuals_resume.html"))
 
         return fig
 
@@ -954,10 +1035,11 @@ class PostProcessing:
         HTML report
             A interactive HTML report.
         """
+        path = Path(__file__).parent
         _ = self.plot_overall_results(save_fig=True)
-        _ = self.plot_confidence_bounds(a, percentilve, save_fig=True)
+        _ = self.plot_confidence_bounds(save_fig=True, **kwargs)
         _ = self.plot_qq(save_fig=True)
         _ = self.plot_standardized_error(save_fig=True)
         _ = self.plot_residuals_resume(save_fig=True)
 
-        return webbrowser.open(f"{name}.html", new=2)
+        return webbrowser.open(path / f"{name}.html", new=2)
