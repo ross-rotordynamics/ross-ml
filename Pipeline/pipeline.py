@@ -62,7 +62,7 @@ def HTML_formater(df, name):
         f.write(html_string.format(table=df.to_html(classes="mystyle")))
 
 
-class Pipeline(object):
+class Pipeline:
     """
 
     Parameters
@@ -105,18 +105,18 @@ class Pipeline(object):
     >>> D.hypothesis_test()
     >>> D.save_model('teste')
     >>> model = rsml.Model('teste')
-    >>> model.load_model()
+    >>> model.load()
     >>> X = Pipeline(df_val).set_features(0,20)
     >>> results = model.predict(X)
     """
 
     def __init__(self, df):
-        path1 = Path(__file__).parent / "img"
-        path2 = Path(__file__).parent / "tables"
-        if not path1.exists():
-            path1.mkdir()
-        if not path2.exists():
-            path2.mkdir()
+        path_img = Path(__file__).parent / "img"
+        path_table = Path(__file__).parent / "tables"
+        if not path_img.exists():
+            path_img.mkdir()
+        if not path_table.exists():
+            path_table.mkdir()
 
         self.df = df
         self.df.dropna(inplace=True)
@@ -192,7 +192,7 @@ class Pipeline(object):
 
         return self.x
 
-    def data_scaling(self, test_size, scaling=True, scalers=[]):
+    def data_scaling(self, test_size, scaling=False, scalers=None):
         """
 
 
@@ -204,20 +204,25 @@ class Pipeline(object):
             scikit-learn scalers.
         scaling : boolean, optional
             Choose between scaling the data or not.
-            The default is True.
+            The default is False.
 
         Returns
         -------
-        Array
-            x_train - features destined for training.
-        Array
-             x_test -features destined for test.
-        Array
-            y_train - labels destined for training.
-        Array
-            y_test - labels destined for test.
+        x_train : array
+            Features destined for training.
+        x_test : array
+            Features destined for test.
+        y_train : array
+            Labels destined for training.
+        y_test : array
+            Labels destined for test.
 
+        Examples
+        --------
         """
+        if scalers is None:
+            scalers = []
+
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
             self.x, self.y, test_size=test_size
         )
@@ -537,8 +542,8 @@ class Model(object):
     def __init__(self, name):
         self.name = name
 
-    def load_model(self):
-        """Load a neural netowork model from rossml folder.
+    def load(self):
+        """Load a neural network model from rossml folder.
 
         Examples
         --------
