@@ -79,7 +79,7 @@ class Pipeline(object):
     >>> df_val= pd.read_csv('xllaby_data-componentes.csv')
     >>> df_val.fillna(df.mean)
 
-    >>> D = Pipeline(df)
+    >>> D = rsml.Pipeline(df)
     >>> D.set_features(0, 20)
     >>> D.set_labels(20, len(D.df.columns))
     >>> D.feature_reduction(15)
@@ -104,7 +104,7 @@ class Pipeline(object):
     >>> url = 'results'
     >>> D.hypothesis_test()
     >>> D.save_model('teste')
-    >>> model = Model('teste')
+    >>> model = rsml.Model('teste')
     >>> model.load_model()
     >>> X = Pipeline(df_val).set_features(0,20)
     >>> results = model.predict(X)
@@ -137,8 +137,9 @@ class Pipeline(object):
             DESCRIPTION.
 
         """
-        self.X = self.df[self.df.columns[start:end]]
-        return self.X
+        self.x = self.df[self.df.columns[start:end]]
+        self.columns = self.x.columns
+        return self.x
 
     def set_labels(self, start, end):
         """
@@ -176,20 +177,20 @@ class Pipeline(object):
         model = DecisionTreeRegressor()
 
         # fit the model
-        model.fit(self.X, self.y)
+        model.fit(self.x, self.y)
 
         # get importance
         importance = model.feature_importances_
 
         # summarize feature importance
         featureScores = pd.concat(
-            [pd.DataFrame(self.X.columns), pd.DataFrame(importance)], axis=1
+            [pd.DataFrame(self.x.columns), pd.DataFrame(importance)], axis=1
         )
         featureScores.columns = ["Specs", "Score"]
         self.best = featureScores.nlargest(n, "Score")["Specs"].values
-        self.X = self.X[self.best]
+        self.x = self.x[self.best]
 
-        return self.X
+        return self.x
 
     def data_scaling(self, test_size, scaling=True, scalers=[]):
         """
@@ -389,7 +390,7 @@ class Pipeline(object):
         R2_a = 1 - (
             (len(self.predictions) - 1)
             * (1 - r2_score(self.y_test, self.predictions))
-            / (len(self.predictions) - (1 + len(self.X.columns)))
+            / (len(self.predictions) - (1 + len(self.x.columns)))
         )
         MAE = mean_absolute_error(self.y_test, self.predictions)
         MSE = mean_squared_error(self.y_test, self.predictions)
@@ -521,10 +522,11 @@ class Pipeline(object):
         if not path.exists():
             path.mkdir()
 
-        self.model.save(path / r"{}.h5".format(name, name))
+        self.model.save(path / r"{}.h5".format(name))
         dump(self.y.columns, open(path / r"{}_columns.pkl".format(name), "wb"))
         dump(self.best, open(path / r"{}_best_features.pkl".format(name), "wb"))
-        dump(self.x.columns, open(path / r"{}_features.pkl".format(name), "wb"))
+        dump(self.columns, open(path / r"{}_features.pkl".format(name), "wb"))
+        dump(self.df.describe(), open(path / r"{}_describe.pkl".format(name), "wb"))
         if self.scaler1 is not None:
             dump(self.scaler1, open(path / r"{}_scaler1.pkl".format(name), "wb"))
         if self.scaler2 is not None:
@@ -544,6 +546,8 @@ class Model(object):
         path = Path(__file__).parent / self.name
         self.model = load_model(path / r"{}.h5".format(self.name))
         self.columns = load(open(path / r"{}_columns.pkl".format(self.name), "rb"))
+        self.features = load(open(path / r"{}_features.pkl".format(self.name), "rb"))
+        self.describe = load(open(path / r"{}_describe.pkl".format(self.name), "rb"))
 
         # load best features
         try:
