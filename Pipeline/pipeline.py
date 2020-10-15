@@ -3,9 +3,8 @@
 ROSS-ML is a module to create neural networks aimed at calculating rotodynamic
 coefficients for bearings and seals.
 """
-import shutil
-
 # fmt: off
+import shutil
 import webbrowser
 from pathlib import Path
 from pickle import dump, load
@@ -109,7 +108,7 @@ class Pipeline:
     >>> url = 'results'
     >>> # results.report(url)
     >>> D.hypothesis_test()
-    >>> D.save_model()
+    >>> D.save()
     >>> model = rsml.Model('Model')
     >>> model.load()
     >>> X = Pipeline(df_val).set_features(0,20)
@@ -561,7 +560,7 @@ class Pipeline:
         results = PostProcessing(self.train, self.test, self.name)
         return results
 
-    def save_model(self):
+    def save(self):
         """Save a neural netowork model.
 
         Examples
