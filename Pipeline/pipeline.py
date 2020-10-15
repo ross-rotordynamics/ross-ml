@@ -4,13 +4,13 @@ ROSS-ML is a module to create neural networks aimed at calculating rotodynamic
 coefficients for bearings and seals.
 """
 # fmt: off
+import shutil
 import webbrowser
 from pathlib import Path
 from pickle import dump, load
 
 import numpy as np
 import pandas as pd
-from keras.regularizers import l2
 from plotly import graph_objects as go
 from plotly.figure_factory import create_scatterplotmatrix
 from plotly.subplots import make_subplots
@@ -37,16 +37,17 @@ from tensorflow.keras.optimizers import Adam
 __all__ = ["HTML_formater", "Pipeline", "Model", "PostProcessing"]
 
 
-def HTML_formater(df, name):
+def HTML_formater(df, name, file):
     """
 
     Parameters
     ----------
-    df : TYPE
+    df : pd.DataFrame
         DESCRIPTION.
-    name : TYPE
-        DESCRIPTION.
-
+    name : str
+        Neural network tag, indicating from which model it refers to.
+    file : str
+        The file name to save the DataFrame.
     """
     path = Path(__file__).parent
     html_string = """
@@ -58,7 +59,7 @@ def HTML_formater(df, name):
                    </body>
                     </html>.
                """
-    with open(path / "tables/{}.html".format(name), "w") as f:
+    with open(path / f"models/{name}/tables/{file}.html", "w") as f:
         f.write(html_string.format(table=df.to_html(classes="mystyle")))
 
 
@@ -68,6 +69,10 @@ class Pipeline:
     Parameters
     ----------
     df : pd.Dataframe
+
+    name : str
+        A tag for the neural network. This name is used to save the model, figures and
+        tables within a folder named after this string.
 
     Examples
     --------
@@ -93,69 +98,81 @@ class Pipeline:
     >>> D.metrics()
 
     Post-processing data
-    >>> postproc = PostProcessing(D.train,D.test)
-    >>> fig = postproc.plot_overall_results()
-    >>> fig = postproc.plot_confidence_bounds(a = 0.01)
-    >>> fig = postproc.plot_standardized_error()
-    >>> fig = postproc.plot_qq()
+    >>> results = D.postprocessing()
+    >>> fig = results.plot_overall_results()
+    >>> fig = results.plot_confidence_bounds(a = 0.01)
+    >>> fig = results.plot_standardized_error()
+    >>> fig = results.plot_qq()
 
     Displays the HTML report
-    >>> # postproc.show()
     >>> url = 'results'
+    >>> # results.report(url)
     >>> D.hypothesis_test()
-    >>> D.save_model('teste')
-    >>> model = rsml.Model('teste')
+    >>> D.save()
+    >>> model = rsml.Model('Model')
     >>> model.load()
     >>> X = Pipeline(df_val).set_features(0,20)
     >>> results = model.predict(X)
     """
 
-    def __init__(self, df):
-        path_img = Path(__file__).parent / "img"
-        path_table = Path(__file__).parent / "tables"
-        if not path_img.exists():
+    def __init__(self, df, name="Model"):
+        path_model = Path(__file__).parent / f"models/{name}"
+        path_img = Path(__file__).parent / f"models/{name}/img"
+        path_table = Path(__file__).parent / f"models/{name}/tables"
+        if not path_model.exists():
+            path_model.mkdir()
             path_img.mkdir()
-        if not path_table.exists():
             path_table.mkdir()
 
         self.df = df
         self.df.dropna(inplace=True)
+        self.name = name
 
     def set_features(self, start, end):
-        """
+        """Select the features from the input DataFrame.
+
+        This methods takes the DataFrame and selects all the columns from "start"
+        to "end" values to indicate which columns should be treated as features.
 
         Parameters
         ----------
         start : int
             Start column of dataframe features
-        end : TYPE
+        end : int
             End column of dataframe features
 
         Returns
         -------
-        TYPE
-            DESCRIPTION.
+        x : pd.DataFrame
+            DataFrame with features parameters
 
+        Example
+        -------
         """
         self.x = self.df[self.df.columns[start:end]]
         self.columns = self.x.columns
         return self.x
 
     def set_labels(self, start, end):
-        """
+        """Select the labels from the input DataFrame.
+
+        This methods takes the DataFrame and selects all the columns from "start"
+        to "end" values to indicate which columns should be treated as labels.
 
         Parameters
         ----------
-        start : TYPE
+        start : int
             Start column of dataframe labels
-        end : TYPE
+        end : int
             End column of dataframe labels
 
         Returns
         -------
-        TYPE
-            DESCRIPTION.
+        y : pd.DataFrame
+            DataFrame with labels parameters
 
+        Example
+        -------
         """
         self.y = self.df[self.df.columns[start:end]]
         return self.y
@@ -166,7 +183,7 @@ class Pipeline:
         Parameters
         ----------
         n : int
-            Number of relevant features
+            Number of relevant features.
 
         Returns
         -------
@@ -200,11 +217,11 @@ class Pipeline:
         ----------
         test_size : float
             Percentage of data destined for testing.
-        scalers : scikit-learn object
-            scikit-learn scalers.
         scaling : boolean, optional
             Choose between scaling the data or not.
             The default is False.
+        scalers : scikit-learn object
+            scikit-learn scalers.
 
         Returns
         -------
@@ -374,11 +391,11 @@ class Pipeline:
                 borderwidth=1,
             ),
         )
-        fig.write_html(str(path / r"img\history.html"))
+        fig.write_html(str(path / f"models/{self.name}/img/history.html"))
 
         return fig
 
-    def metrics(self):
+    def metrics(self, save=False):
         """Print model metrics.
 
         This function displays the model metrics while the neural network is being
@@ -406,14 +423,16 @@ class Pipeline:
             index=["MAE", "MSE", "R2", "R2_adj", "explained variance"],
             columns=["Metric"],
         )
-        HTML_formater(metrics, "Metrics")
+        if save:
+            HTML_formater(metrics, self.name, "Metrics")
+
         print(
             "Scores:\nMAE: {}\nMSE: {}\nR^2:{}\nR^2 adjusted:{}\nExplained variance:{}".format(
                 MAE, MSE, R2, R2_a, explained_variance
             )
         )
 
-    def hypothesis_test(self, kind="ks", p_value=0.05):
+    def hypothesis_test(self, kind="ks", p_value=0.05, save=False):
         """Run a hypothesis test.
 
         Parameters
@@ -436,6 +455,9 @@ class Pipeline:
         p_value : float, optional
             Critical value. Must be within 0 and 1.
             The default is 0.05.
+        save : boolean
+            If True, saves the hypothesis test. If False, the hypothesis_test won't be
+            saved.
 
         Returns
         -------
@@ -460,7 +482,8 @@ class Pipeline:
                 "Not Reject H0" if p > p_value else "Reject H0"
                 for p in p_df["p-value: train"]
             ]
-            HTML_formater(p_df, "KS Test")
+            if save:
+                HTML_formater(p_df, self.name, "KS Test")
 
         elif kind == "w":
             p_values = np.round(
@@ -477,7 +500,8 @@ class Pipeline:
                 "Not Reject H0" if p > p_value else "Reject H0"
                 for p in p_df["p-value: acc"]
             ]
-            HTML_formater(p_df, "Welch Test")
+            if save:
+                HTML_formater(p_df, self.name, "Welch Test")
 
         return p_df
 
@@ -486,9 +510,9 @@ class Pipeline:
 
         Parameters
         ----------
-        x : TYPE
+        x : pd.DataFrame
             DESCRIPTION.
-        y : TYPE
+        y : pd.DataFrame
             DESCRIPTION.
 
         Returns
@@ -512,33 +536,54 @@ class Pipeline:
 
         return self.train, self.test
 
-    def save_model(self, name):
-        """Save a neural netowork model.
+    def postprocessing(self):
+        """Create an instance to plot results for neural networks.
 
-        Parameters
-        ----------
-        name : str
-            The folder's name where the model will be saved
+        This method returns an instance from PostProcessing class. It allows plotting
+        some analyzes for neural networks and a HTML report with a result summary.
+            - plot_overall_results
+            - plot_confidence_bounds
+            - plot_qq
+            - plot_standardized_error
+            - plot_residuals_resume
+            - show
+
+        Returns
+        -------
+        results : PostProcessing object
+            An instance from PostProcessing class that allows plotting some analyzes
+            for neural networks.
 
         Examples
         --------
         """
-        path = Path(__file__).parent / name
+        results = PostProcessing(self.train, self.test, self.name)
+        return results
+
+    def save(self):
+        """Save a neural netowork model.
+
+        Examples
+        --------
+        """
+        path = Path(__file__).parent / f"models/{self.name}"
         if not path.exists():
             path.mkdir()
 
-        self.model.save(path / r"{}.h5".format(name))
-        dump(self.y.columns, open(path / r"{}_columns.pkl".format(name), "wb"))
-        dump(self.best, open(path / r"{}_best_features.pkl".format(name), "wb"))
-        dump(self.columns, open(path / r"{}_features.pkl".format(name), "wb"))
-        dump(self.df.describe(), open(path / r"{}_describe.pkl".format(name), "wb"))
+        self.model.save(path / r"{}.h5".format(self.name))
+        dump(self.y.columns, open(path / r"{}_columns.pkl".format(self.name), "wb"))
+        dump(self.best, open(path / r"{}_best_features.pkl".format(self.name), "wb"))
+        dump(self.columns, open(path / r"{}_features.pkl".format(self.name), "wb"))
+        dump(
+            self.df.describe(), open(path / r"{}_describe.pkl".format(self.name), "wb")
+        )
         if self.scaler1 is not None:
-            dump(self.scaler1, open(path / r"{}_scaler1.pkl".format(name), "wb"))
+            dump(self.scaler1, open(path / r"{}_scaler1.pkl".format(self.name), "wb"))
         if self.scaler2 is not None:
-            dump(self.scaler2, open(path / r"{}_scaler2.pkl".format(name), "wb"))
+            dump(self.scaler2, open(path / r"{}_scaler2.pkl".format(self.name), "wb"))
 
 
-class Model(object):
+class Model:
     def __init__(self, name):
         self.name = name
 
@@ -548,7 +593,7 @@ class Model(object):
         Examples
         --------
         """
-        path = Path(__file__).parent / self.name
+        path = Path(__file__).parent / f"models/{self.name}"
         self.model = load_model(path / r"{}.h5".format(self.name))
         self.columns = load(open(path / r"{}_columns.pkl".format(self.name), "rb"))
         self.features = load(open(path / r"{}_features.pkl".format(self.name), "rb"))
@@ -623,10 +668,11 @@ class Model(object):
 
 
 class PostProcessing:
-    def __init__(self, train, test):
+    def __init__(self, train, test, name):
         self.train = train
         self.test = test
         self.test.index = self.train.index
+        self.name = name
 
     def plot_overall_results(self, save_fig=False):
         """
@@ -673,7 +719,7 @@ class PostProcessing:
         fig.update_yaxes(**axes_default)
 
         if save_fig:
-            fig.write_html(str(path / r"img\pairplot.html"))
+            fig.write_html(str(path / f"models/{self.name}/img/pairplot.html"))
 
         return fig
 
@@ -775,7 +821,7 @@ class PostProcessing:
             figures.append(fig)
 
             if save_fig:
-                fig.write_html(str(path / r"img\CI_{}.html".format(v)))
+                fig.write_html(str(path / f"models/{self.name}/img/CI_{v}.html"))
 
         return figures
 
@@ -852,7 +898,7 @@ class PostProcessing:
             figures.append(fig)
 
             if save_fig:
-                fig.write_html(str(path / r"img\qq_plot_{}.html".format(v)))
+                fig.write_html(str(path / f"models/{self.name}/img/qq_plot_{v}.html"))
 
         return figures
 
@@ -936,7 +982,10 @@ class PostProcessing:
 
             if save_fig:
                 fig.write_html(
-                    str(path / r"img\standardized_error_{}_plot.html".format(v))
+                    str(
+                        path
+                        / f"models/{self.name}/img/standardized_error_{v}_plot.html"
+                    )
                 )
 
         return figures
@@ -1019,11 +1068,11 @@ class PostProcessing:
         )
 
         if save_fig:
-            fig.write_html(str(path / r"img\residuals_resume.html"))
+            fig.write_html(str(path / f"models/{self.name}/img/residuals_resume.html"))
 
         return fig
 
-    def show(self, name="results", **kwargs):
+    def report(self, file="results", **kwargs):
         """Display the HTML report on browser.
 
         The report contains a brief content about the neural network built.
@@ -1044,11 +1093,15 @@ class PostProcessing:
         HTML report
             A interactive HTML report.
         """
-        path = Path(__file__).parent
         _ = self.plot_overall_results(save_fig=True)
         _ = self.plot_confidence_bounds(save_fig=True, **kwargs)
         _ = self.plot_qq(save_fig=True)
         _ = self.plot_standardized_error(save_fig=True)
         _ = self.plot_residuals_resume(save_fig=True)
 
-        return webbrowser.open(path / f"{name}.html", new=2)
+        from_path = Path(__file__).parent / "template"
+        to_path = Path(__file__).parent / f"models/{self.name}"
+        for file in from_path.glob("**/*"):
+            shutil.copy(file, to_path)
+
+        return webbrowser.open(str(to_path / f"{file}.html"), new=2)

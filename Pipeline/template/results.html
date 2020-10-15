@@ -3,7 +3,7 @@
 	<head>
 		<title>Results</title>
 		<meta charset="utf-8"/><!-atributo charset recebeu utf-8->
-		<link rel="stylesheet" type="text/css" href="css/style.css">
+		<link rel="stylesheet" type="text/css" href="style.css">
 	</head><SCRIPT SRC='https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'></SCRIPT>
 		<SCRIPT>MathJax.Hub.Config({ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}})</SCRIPT>
 		<script type="text/javascript">
@@ -51,7 +51,7 @@
 				<li>Q-Q plots</li>
 				<li>Standardized error of residuals plots</li>
 				<li> Residuals resume</li>
-			</ul>	
+			</ul>
 		<div class = "Model_History">
 			Model History<br>
 			<p class = 'text1'>Terminology:</p>
@@ -60,7 +60,7 @@
 				<li>Val_loss:error during validation </li>
 			</ul>
 			<p class = 'text2'> Rule of thumb: if loss is significantly lower than val_loss, the data is probably overfitted</p>
-			<img class = "history_log" src="img\history.png">
+    		<iframe src="img\history.html" width="800px" height="600px" class="center"></iframe>
 		</div>
 		<div class = "Model_metrics">
 			Model Metrics<br>
@@ -72,51 +72,54 @@
 				<li><a target="_blank" class = "link" href="https://en.wikipedia.org/wiki/Coefficient_of_determination"> \(R^2_{adj}\) </a>\( =1- (1-R^2)\frac{n-1}{n-p-1} \)</li>
 				<li><a target="_blank" href = "https://scikit-learn.org/stable/modules/model_evaluation.html#explained-variance-score">Explained variance</a> = \(1 - \frac{Var(y-\hat{y})}{Var(y)}\)</li>
 			</ul>
-			Check those results <a target="_blank" href="tables/Metrics.html">Here</a>
 			<div class = "HypTest">
-				This program implements two Hypothesis Tests
-				<ul class = list4>
-					<li><a target="_blank" href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Komolgorov-Smirnov</a>: <a target="_blank" href="tables/KS Test.html"> Model results</a></li>
-					<li><a target="_blank" href="https://en.wikipedia.org/wiki/Welch%27s_t-test">Welch</a>:<a target="_blank" href="tables/Welch Test.html"> Model results</a></li> </li>
-				</ul>
-			</div>
+			This program implements two Hypothesis Tests
+			<ul class = list4>
+				<li><a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Komolgorov-Smirnov</a></li>
+				<li><a href="https://en.wikipedia.org/wiki/Welch%27s_t-test">Welch</a></li>
+			</ul>
 		</div>
-		<p>Overall results: </p>
+			Model results:<br>
+			<input type="file" id="fileUpload" />
+			<input type="button" id="upload" value="Upload" onclick="Upload()" />
+			<hr />
+			<div id="dvCSV" class = "table">
+			</div>
 		<div class = 'overall'>
-			<img src="img\pairplot.png" alt="pairplot" style="width:100%">
+    		<iframe src="img\pairplot.html" width="1500px" height="1500px"></iframe>
 		</div>
 		<div class = 'QQ_plots'>
 			Q-Q plots:
 			<div class="row">
 	  			<div class="column">
-	    		<img src="img\qq_plot_kxx.png" alt="kxx" style="width:100%">
+	    		<iframe src="img\qq_plot_kxx.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  			<div class="column">
-	    		<img src="img\qq_plot_kxy.png" alt="kxy" style="width:100%">
-	  			</div>
-	  		</div>
-	  		<div class="row">
-	  			<div class="column">
-	    		<img src="img\qq_plot_kyx.png" alt="kxx" style="width:100%">
-	  			</div>
-	  			<div class="column">
-	    		<img src="img\qq_plot_kyy.png" alt="kxy" style="width:100%">
+	    		<iframe src="img\qq_plot_kxy.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  		</div>
 	  		<div class="row">
 	  			<div class="column">
-	    		<img src="img\qq_plot_cxx.png" alt="kxx" style="width:100%">
+	    		<iframe src="img\qq_plot_kyx.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  			<div class="column">
-	    		<img src="img\qq_plot_cxy.png" alt="kxy" style="width:100%">
+	    		<iframe src="img\qq_plot_kyy.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  		</div>
 	  		<div class="row">
 	  			<div class="column">
-	    		<img src="img\qq_plot_cyx.png" alt="kxx" style="width:100%">
+	    		<iframe src="img\qq_plot_cxx.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  			<div class="column">
-	    		<img src="img\qq_plot_cyy.png" alt="kxy" style="width:100%">
+	    		<iframe src="img\qq_plot_cxy.html" width="100%" height="500px"></iframe>
+	  			</div>
+	  		</div>
+	  		<div class="row">
+	  			<div class="column">
+	    		<iframe src="img\qq_plot_cyx.html" width="100%" height="500px"></iframe>
+	  			</div>
+	  			<div class="column">
+	    		<iframe src="img\qq_plot_cyy.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  		</div>
 		</div>
@@ -124,34 +127,34 @@
 			Standardized Residuals:
 			<div class="row">
 	  			<div class="column">
-	    		<img src="img\standardized_error_kxx_plot.png" alt="kxx" style="width:100%">
+	    		<iframe src="img\standardized_error_kxx_plot.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  			<div class="column">
-	    		<img src="img\standardized_error_kxy_plot.png" alt="kxy" style="width:100%">
-	  			</div>
-	  		</div>
-	  		<div class="row">
-	  			<div class="column">
-	    		<img src="img\standardized_error_kyx_plot.png" alt="kxx" style="width:100%">
-	  			</div>
-	  			<div class="column">
-	    		<img src="img\standardized_error_kyy_plot.png" alt="kxy" style="width:100%">
+	    		<iframe src="img\standardized_error_kxy_plot.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  		</div>
 	  		<div class="row">
 	  			<div class="column">
-	    		<img src="img\standardized_error_cxx_plot.png" alt="kxx" style="width:100%">
+	    		<iframe src="img\standardized_error_kyx_plot.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  			<div class="column">
-	    		<img src="img\standardized_error_cxy_plot.png" alt="kxy" style="width:100%">
+	    		<iframe src="img\standardized_error_kyy_plot.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  		</div>
 	  		<div class="row">
 	  			<div class="column">
-	    		<img src="img\standardized_error_cyx_plot.png" alt="kxx" style="width:100%">
+	    		<iframe src="img\standardized_error_cxx_plot.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  			<div class="column">
-	    		<img src="img\standardized_error_cyy_plot.png" alt="kxy" style="width:100%">
+	    		<iframe src="img\standardized_error_cxy_plot.html" width="100%" height="500px"></iframe>
+	  			</div>
+	  		</div>
+	  		<div class="row">
+	  			<div class="column">
+	    		<iframe src="img\standardized_error_cyx_plot.html" width="100%" height="500px"></iframe>
+	  			</div>
+	  			<div class="column">
+	    		<iframe src="img\standardized_error_cyy_plot.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  		</div>
 		</div>
@@ -159,34 +162,34 @@
 			Confidence intervals using the DKW inequality:
 			<div class="row">
 	  			<div class="column">
-	    		<img src="img\CI_kxx.png" alt="kxx" style="width:100%">
+	    		<iframe src="img\CI_kxx.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  			<div class="column">
-	    		<img src="img\CI_kxy.png" alt="kxy" style="width:100%">
-	  			</div>
-	  		</div>
-	  		<div class="row">
-	  			<div class="column">
-	    		<img src="img\CI_kyx.png" alt="kxx" style="width:100%">
-	  			</div>
-	  			<div class="column">
-	    		<img src="img\CI_kyy.png" alt="kxy" style="width:100%">
+	    		<iframe src="img\CI_kxy.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  		</div>
 	  		<div class="row">
 	  			<div class="column">
-	    		<img src="img\CI_cxx.png" alt="kxx" style="width:100%">
+	    		<iframe src="img\CI_kyx.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  			<div class="column">
-	    		<img src="img\CI_cxy.png" alt="kxy" style="width:100%">
+	    		<iframe src="img\CI_kyy.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  		</div>
 	  		<div class="row">
 	  			<div class="column">
-	    		<img src="img\CI_cyx.png" alt="kxx" style="width:100%">
+	    		<iframe src="img\CI_cxx.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  			<div class="column">
-	    		<img src="img\CI_cyy.png" alt="kxy" style="width:100%">
+	    		<iframe src="img\CI_cxy.html" width="100%" height="500px"></iframe>
+	  			</div>
+	  		</div>
+	  		<div class="row">
+	  			<div class="column">
+	    		<iframe src="img\CI_cyx.html" width="100%" height="500px"></iframe>
+	  			</div>
+	  			<div class="column">
+	    		<iframe src="img\CI_cyy.html" width="100%" height="500px"></iframe>
 	  			</div>
 	  		</div>
 		</div>
