@@ -34,7 +34,7 @@ from tensorflow.keras.optimizers import Adam
 
 # fmt: on
 
-__all__ = ["HTML_formater", "Pipeline", "Model", "PostProcessing"]
+__all__ = ["HTML_formater", "available_models", "Pipeline", "Model", "PostProcessing"]
 
 
 def HTML_formater(df, name, file):
@@ -61,6 +61,29 @@ def HTML_formater(df, name, file):
                """
     with open(path / f"models/{name}/tables/{file}.html", "w") as f:
         f.write(html_string.format(table=df.to_html(classes="mystyle")))
+
+
+def available_models():
+    """Check for available neural network models.
+
+    This function returns a list of all neural network models saved.
+    If None is available, it returns a message informing there's no models previously
+    saved.
+
+    Returns
+    -------
+    dirs : list
+        List of all neural network models saved.
+    """
+    try:
+        path = Path(__file__).parent / "models"
+        dirs = [folder for folder in path.iterdir() if folder.is_dir()]
+        if len(dirs) == 0:
+            dirs = "No neural network models available."
+    except FileNotFoundError:
+        dirs = "No neural network models available."
+
+    return dirs
 
 
 class Pipeline:
@@ -110,7 +133,6 @@ class Pipeline:
     >>> D.hypothesis_test()
     >>> D.save()
     >>> model = rsml.Model('Model')
-    >>> model.load()
     >>> X = Pipeline(df_val).set_features(0,20)
     >>> results = model.predict(X)
     """
@@ -586,6 +608,7 @@ class Pipeline:
 class Model:
     def __init__(self, name):
         self.name = name
+        self.load()
 
     def load(self):
         """Load a neural network model from rossml folder.
