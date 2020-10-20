@@ -32,7 +32,7 @@ def version(path):
 # Package meta-data.
 NAME = "ross-ml"
 DESCRIPTION = "ross-machine-learning"
-URL = "https://github.com/ross-rotordynamics/ross-ml
+URL = "https://github.com/ross-rotordynamics/ross-ml"
 EMAIL = "raphaelts@gmail.com"
 AUTHOR = "ROSS developers"
 REQUIRES_PYTHON = ">=3.6.0"
