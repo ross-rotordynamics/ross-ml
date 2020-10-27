@@ -38,7 +38,10 @@ __all__ = ["HTML_formater", "available_models", "Pipeline", "Model", "PostProces
 
 
 def HTML_formater(df, name, file):
-    """
+    """Table to HTML formater.
+
+    This function takes a pandas DataFrame and writes it to HTML format. It's an
+    auxiliary function to build the HTML Report.
 
     Parameters
     ----------
@@ -74,6 +77,12 @@ def available_models():
     -------
     dirs : list
         List of all neural network models saved.
+
+    Examples
+    --------
+    >>> import rossml as rsml
+    >>> rsml.available_models()
+    ['test_model']
     """
     try:
         path = Path(__file__).parent / "models"
@@ -87,7 +96,20 @@ def available_models():
 
 
 class Pipeline:
-    """
+    """Generate an artificial neural netowrk.
+
+    This class is a pipeline for building neural network models. From the data
+    spreadsheet to the model it self, each function for this class has to be called in
+    an exact order to guarantee its the correct functioning.
+
+    The basic order to follow:
+        - Pipeline
+        - set_features()
+        - set_labels()
+        - feature_reduction()
+        - data_scaling()
+        - build_Sequential_ANN()
+        - model_run()
 
     Parameters
     ----------
@@ -101,39 +123,51 @@ class Pipeline:
     --------
     >>> import pandas as pd
     >>> import rossml as rsml
+    >>> from sklearn.preprocessing import RobustScaler
 
     Importing and collecting data
     >>> df = pd.read_csv('seal_fake.csv')
     >>> df_val= pd.read_csv('xllaby_data-componentes.csv')
     >>> df_val.fillna(df.mean)
 
-    >>> D = rsml.Pipeline(df)
+    Building the neural network model
+    >>> name = "Model"  # this name will be used to save your work
+    >>> D = rsml.Pipeline(df, name)
+
+    Selecting features and labels
     >>> D.set_features(0, 20)
     >>> D.set_labels(20, len(D.df.columns))
     >>> D.feature_reduction(15)
+
+    Data scaling and running the model
     >>> D.data_scaling(0.1, scalers=[RobustScaler(), RobustScaler()], scaling=True)
     >>> D.build_Sequential_ANN(4, [50, 50, 50, 50])
     >>> model, predictions = D.model_run(batch_size=300, epochs=1000)
 
-    Get the model configurations to change it afterwards
+    Get the model configurations to change it afterwards. These evaluations are
+    important to decide whether the neural network meets or not the user requirements.
     >>> # model.get_config()
     >>> D.model_history()
     >>> D.metrics()
+    >>> D.hypothesis_test()
 
-    Post-processing data
+    Post-processing Data
     >>> results = D.postprocessing()
     >>> fig = results.plot_overall_results()
     >>> fig = results.plot_confidence_bounds(a = 0.01)
     >>> fig = results.plot_standardized_error()
     >>> fig = results.plot_qq()
 
+    Saving a model
+    >>> D.save()
+
     Displays the HTML report
     >>> url = 'results'
     >>> # results.report(url)
-    >>> D.hypothesis_test()
-    >>> D.save()
-    >>> model = rsml.Model('Model')
-    >>> X = Pipeline(df_val).set_features(0,20)
+
+    Loading a neural network model
+    >>> model = rsml.Model("Model")
+    >>> X = Pipeline(df).set_features(0,20)
     >>> results = model.predict(X)
     """
 
@@ -200,7 +234,11 @@ class Pipeline:
         return self.y
 
     def feature_reduction(self, n):
-        """
+        """Feature reduction using Decision Tree Regression method.
+
+        This function uses Decision Tree Regression to select the "n" best features.
+        Due it's random aspects, the selected best features may not be the same every
+        time this function is called.
 
         Parameters
         ----------
@@ -209,8 +247,8 @@ class Pipeline:
 
         Returns
         -------
-        Minimum number of features that satisfies "n" for each label.
-
+        x : pd.DataFrame
+            Minimum number of features that satisfies "n" for each label.
         """
         # define the model
         model = DecisionTreeRegressor()
@@ -232,8 +270,13 @@ class Pipeline:
         return self.x
 
     def data_scaling(self, test_size, scaling=False, scalers=None):
-        """
+        """Perform data scalling.
 
+        This function scales the input and output data. The DataFrame provided may have
+        multiple variables with different units and leading to completely distinguished
+        magnitude values. Unscaled input variables can result in a slow or unstable
+        learning process, whereas unscaled target variables on regression problems
+        can result in exploding gradients causing the learning process to fail.
 
         Parameters
         ----------
@@ -243,7 +286,9 @@ class Pipeline:
             Choose between scaling the data or not.
             The default is False.
         scalers : scikit-learn object
-            scikit-learn scalers.
+            scikit-learn scalers method. Check sklearn.preprocessing for more
+            informations about each scaler method.
+            The default is None.
 
         Returns
         -------
@@ -281,7 +326,7 @@ class Pipeline:
         return self.x_train, self.x_test, self.y_train, self.y_test
 
     def build_Sequential_ANN(self, hidden, neurons, dropout_layers=None, dropout=None):
-        """
+        """Construct a sequential Artificial Neural Network from Keras models.
 
         Parameters
         ----------
@@ -319,7 +364,7 @@ class Pipeline:
         return self.model
 
     def model_run(self, optimizer="adam", loss="mse", batch_size=16, epochs=500):
-        """
+        """Run the neural network model.
 
         Parameters
         ----------
@@ -335,7 +380,6 @@ class Pipeline:
         Returns
         -------
         model : keras neural network
-        predictions :
         """
         self.model.compile(optimizer=optimizer, loss=loss)
         self.history = self.model.fit(
@@ -357,8 +401,12 @@ class Pipeline:
     def model_history(self):
         """Plot model history.
 
-        Examples
-        --------
+        Plots the history of loss and val_loss vs the number of epochs.
+
+        Returns
+        -------
+        fig : Plotly.figure
+            Loss and Val_Loss data through the epochs.
         """
         path = Path(__file__).parent
 
@@ -420,8 +468,14 @@ class Pipeline:
     def metrics(self, save=False):
         """Print model metrics.
 
-        This function displays the model metrics while the neural network is being
+        This function displays the model metrics after the neural network is being
         built.
+
+        Parameters
+        ----------
+        save : bool, optional
+            Key to decide if the table values should be saved in a HTML table or not.
+            True saves the table; False do not.
 
         Prints
         ------
@@ -457,6 +511,12 @@ class Pipeline:
     def hypothesis_test(self, kind="ks", p_value=0.05, save=False):
         """Run a hypothesis test.
 
+        This function runs a hypothesis test based on the observed data modeled as the
+        realised values taken by a collection of random variables. There are 2 options
+        available to run these tests:
+            "ks": Komolgorov-Smirnov test
+            "w": Welch test
+
         Parameters
         ----------
         kind : string, optional
@@ -481,10 +541,18 @@ class Pipeline:
             If True, saves the hypothesis test. If False, the hypothesis_test won't be
             saved.
 
+        References
+        ----------
+        Larry Wasserman. 2010. All of Statistics: A Concise Course in Statistical
+        Inference. Springer Publishing Company, Incorporated.
+
         Returns
         -------
         p_df : pd.DataFrame
             Hypothesis test results.
+            The first column returns the p-value. The second column returns the status,
+            which can reject or not the test result. If the calculated p-value is
+            greater than "p_value" arg, the result shall be "Not Reject".
 
         Examples
         --------
@@ -528,7 +596,7 @@ class Pipeline:
         return p_df
 
     def validation(self, x, y):
-        """
+        """Perform model validation.
 
         Parameters
         ----------
@@ -585,6 +653,10 @@ class Pipeline:
     def save(self):
         """Save a neural netowork model.
 
+        This function saves the required files for the neural network model.
+        It creates a new folder named after the "name" argument passed to Pipeline
+        initialization. This folder can be found within the rossml folder package.
+
         Examples
         --------
         """
@@ -606,16 +678,27 @@ class Pipeline:
 
 
 class Model:
+    """Retrieve a previously neural network saved.
+
+    This class loads any neural network built from Pipeline class. It can be used to
+    retrieve the model and predict new coefficients from a data set.
+
+    Parameters
+    ----------
+    name : str
+        The neural network folder's name to load.
+
+    Returns
+    -------
+    A neural network model
+    """
+
     def __init__(self, name):
         self.name = name
         self.load()
 
     def load(self):
-        """Load a neural network model from rossml folder.
-
-        Examples
-        --------
-        """
+        """Load a neural network model from rossml folder."""
         path = Path(__file__).parent / f"models/{self.name}"
         self.model = load_model(path / r"{}.h5".format(self.name))
         self.columns = load(open(path / r"{}_columns.pkl".format(self.name), "rb"))
@@ -627,36 +710,37 @@ class Model:
             self.best = load(
                 open(path / r"{}_best_features.pkl".format(self.name), "rb")
             )
-        except:
+        except FileNotFoundError:
             self.best = None
 
         # load the scaler
         try:
             self.scaler1 = load(open(path / r"{}_scaler1.pkl".format(self.name), "rb"))
-        except:
+        except FileNotFoundError:
             self.scaler1 = None
 
         try:
             self.scaler2 = load(open(path / r"{}_scaler2.pkl".format(self.name), "rb"))
-        except:
+        except FileNotFoundError:
             self.scaler2 = None
 
     def predict(self, x):
-        """
+        """Predict rotordynamics coefficients.
 
+        This function takes a Series or a DataFram with input values (must match the
+        model features) and uses it to calculate new coefficients.
 
         Parameters
         ----------
-        x : TYPE
-            DESCRIPTION.
+        x : pd.Series, pd.DataFrame
+            A series or dataframe with input data to predict new rotordynamics
+            coefficients.
 
         Returns
         -------
-        TYPE
+        results : pd.DataFrame
             DESCRIPTION.
-
         """
-
         if self.best is None:
             self.x = x
         else:
@@ -681,6 +765,19 @@ class Model:
         return self.results
 
     def coefficients(self):
+        """Return the predicted stiffness and damping coefficients.
+
+        This function only returns an output if Model.predict() has been run.
+        It takes the results from Model.predict() and slices it into K (stiffness) and
+        C (damping) lists.
+
+        Returns
+        -------
+        K : list
+            List with the predicted stiffness coefficientes.
+        C : list
+            List with the predicted damping coefficientes.
+        """
         self.K = []
         self.C = []
         for results in self.results.values:
@@ -691,6 +788,18 @@ class Model:
 
 
 class PostProcessing:
+    """Class used to store and postprocess results from a neural network model.
+
+    Parameters
+    ----------
+    train : pd.DataFrame
+        DESCRIPTION.
+    test : pd.DataFrame
+        DESCRIPTION.
+    name : str
+        The neural network folder's name to load.
+    """
+
     def __init__(self, train, test, name):
         self.train = train
         self.test = test
@@ -747,7 +856,7 @@ class PostProcessing:
         return fig
 
     def plot_confidence_bounds(self, a=0.01, percentile=0.05, save_fig=False):
-        """Plot a confidence interval based on DKW inequality.
+        """Plot and save a confidence interval based on DKW inequality.
 
         Parameters
         ----------
@@ -849,7 +958,7 @@ class PostProcessing:
         return figures
 
     def plot_qq(self, save_fig=False):
-        """
+        """Plot and save a qq-plot of the training set.
 
         Parameters
         ----------
