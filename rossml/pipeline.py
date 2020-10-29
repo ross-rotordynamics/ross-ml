@@ -86,7 +86,7 @@ def available_models():
     """
     try:
         path = Path(__file__).parent / "models"
-        dirs = [folder for folder in path.iterdir() if folder.is_dir()]
+        dirs = [folder.name for folder in path.iterdir() if folder.is_dir()]
         if len(dirs) == 0:
             dirs = "No neural network models available."
     except FileNotFoundError:
