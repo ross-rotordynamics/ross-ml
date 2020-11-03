@@ -1,1 +1,3 @@
 include requirements.txt README.md LICENSE.md
+recursive-include rossml/template *
+recursive-include rossml/models/test_model *
