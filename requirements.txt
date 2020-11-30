@@ -2,6 +2,7 @@ numpy
 scipy
 pandas>=0.23
 plotly>=4.7.0
+ross-rotordynamics
 statsmodels
 sklearn
 tensorflow
