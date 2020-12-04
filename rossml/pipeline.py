@@ -126,9 +126,7 @@ class Pipeline:
     >>> from sklearn.preprocessing import RobustScaler
 
     Importing and collecting data
-    >>> df = pd.read_csv('seal_fake.csv')
-    >>> df_val= pd.read_csv('xllaby_data-componentes.csv')
-    >>> df_val.fillna(df.mean)
+    >>> df = pd.read_csv(r"data\seal_data.csv")
 
     Building the neural network model
     >>> name = "Model"  # this name will be used to save your work

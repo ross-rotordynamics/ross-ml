@@ -6,7 +6,7 @@ from numpy.testing import assert_allclose, assert_almost_equal, assert_equal
 from sklearn.preprocessing import RobustScaler
 from tensorflow.keras.models import Sequential
 
-from pipeline import Model, Pipeline
+from rossml.pipeline import Model, Pipeline
 
 df = pd.read_csv(r"data\seal_data.csv")
 
