@@ -133,8 +133,8 @@ class Pipeline:
     >>> D = rsml.Pipeline(df, name)
 
     Selecting features and labels
-    >>> D.set_features(0, 20)
-    >>> D.set_labels(20, len(D.df.columns))
+    >>> D.set_features(1, 21)
+    >>> D.set_labels(21, len(D.df.columns))
     >>> D.feature_reduction(15)
 
     Data scaling and running the model
