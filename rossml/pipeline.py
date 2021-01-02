@@ -1061,9 +1061,6 @@ class PostProcessing:
         """
         path = Path(__file__).parent
         var = list(self.train.columns)
-        error = self.test - self.train
-        error = error / error.std()
-        error.dropna(inplace=True)
         axes_default = dict(
             gridcolor="lightgray",
             showline=True,
@@ -1076,6 +1073,8 @@ class PostProcessing:
         figures = []
         for v in var:
             error = self.test[v] - self.train[v]
+            error = error / error.std()
+            error.dropna(inplace=True)
             fig = go.Figure()
 
             fig.add_trace(
@@ -1102,7 +1101,7 @@ class PostProcessing:
                 **axes_default,
             )
             fig.update_layout(
-                title_text=f"Standard Deviation: {np.round(np.std(error), 1)}",
+                title_text=f"Standard Deviation: {np.round(np.std(error), 2)}",
                 plot_bgcolor="white",
                 legend=dict(
                     bgcolor="white",
