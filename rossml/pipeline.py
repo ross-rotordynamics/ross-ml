@@ -1102,6 +1102,7 @@ class PostProcessing:
                 **axes_default,
             )
             fig.update_layout(
+                title_text=f"Standard Deviation: {np.round(np.std(error), 1)}",
                 plot_bgcolor="white",
                 legend=dict(
                     bgcolor="white",
