@@ -318,6 +318,10 @@ class Pipeline:
                     self.y_train = self.scaler2.fit_transform(self.y_train)
                     self.y_test = self.scaler2.transform(self.y_test)
         else:
+            self.x_train = self.x_train.values
+            self.x_test = self.x_test.values
+            self.y_train = self.y_train.values
+            self.y_test = self.y_test.values
             self.scaler1 = None
             self.scaler2 = None
 
@@ -388,12 +392,21 @@ class Pipeline:
             epochs=epochs,
         )
         self.predictions = self.model.predict(self.x_test)
-        self.train = pd.DataFrame(
-            self.scaler2.inverse_transform(self.predictions), columns=self.y.columns
-        )
-        self.test = pd.DataFrame(
-            self.scaler2.inverse_transform(self.y_test), columns=self.y.columns
-        )
+        if self.scaler2 != None:
+            self.train = pd.DataFrame(
+                self.scaler2.inverse_transform(self.predictions), columns=self.y.columns
+            )
+            self.test = pd.DataFrame(
+                self.scaler2.inverse_transform(self.y_test), columns=self.y.columns
+            )
+        else:
+            self.train = pd.DataFrame(
+                self.predictions, columns=self.y.columns
+            )
+            self.test = pd.DataFrame(
+                self.y_test, columns=self.y.columns
+            )
+
         return self.model, self.predictions
 
     def model_history(self):
@@ -1048,9 +1061,6 @@ class PostProcessing:
         """
         path = Path(__file__).parent
         var = list(self.train.columns)
-        error = self.test - self.train
-        error = error / error.std()
-        error.dropna(inplace=True)
         axes_default = dict(
             gridcolor="lightgray",
             showline=True,
@@ -1063,6 +1073,8 @@ class PostProcessing:
         figures = []
         for v in var:
             error = self.test[v] - self.train[v]
+            error = error / error.std()
+            error.dropna(inplace=True)
             fig = go.Figure()
 
             fig.add_trace(
@@ -1089,6 +1101,7 @@ class PostProcessing:
                 **axes_default,
             )
             fig.update_layout(
+                title_text=f"Standard Deviation: {np.round(np.std(error), 2)}",
                 plot_bgcolor="white",
                 legend=dict(
                     bgcolor="white",
