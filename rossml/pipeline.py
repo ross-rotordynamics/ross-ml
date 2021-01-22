@@ -96,7 +96,7 @@ def available_models():
 
 
 class Pipeline:
-    """Generate an artificial neural netowrk.
+    r"""Generate an artificial neural netowrk.
 
     This class is a pipeline for building neural network models. From the data
     spreadsheet to the model it self, each function for this class has to be called in
@@ -150,7 +150,7 @@ class Pipeline:
     >>> D.hypothesis_test()
 
     Post-processing Data
-    >>> results = D.postprocessing()
+    >>> results = PostProcessing(D.train,D.test, name)
     >>> fig = results.plot_overall_results()
     >>> fig = results.plot_confidence_bounds(a = 0.01)
     >>> fig = results.plot_standardized_error()
@@ -181,6 +181,7 @@ class Pipeline:
         self.df = df
         self.df.dropna(inplace=True)
         self.name = name
+        self.best = None
 
     def set_features(self, start, end):
         """Select the features from the input DataFrame.
@@ -298,9 +299,6 @@ class Pipeline:
             Labels destined for training.
         y_test : array
             Labels destined for test.
-
-        Examples
-        --------
         """
         if scalers is None:
             scalers = []
@@ -392,7 +390,7 @@ class Pipeline:
             epochs=epochs,
         )
         self.predictions = self.model.predict(self.x_test)
-        if self.scaler2 != None:
+        if self.scaler2 is None:
             self.train = pd.DataFrame(
                 self.scaler2.inverse_transform(self.predictions), columns=self.y.columns
             )
@@ -473,6 +471,7 @@ class Pipeline:
             ),
         )
         fig.write_html(str(path / f"models/{self.name}/img/history.html"))
+        fig.write_image(str(path / f"models/{self.name}/img/history.png"))
 
         return fig
 
@@ -612,17 +611,16 @@ class Pipeline:
         Parameters
         ----------
         x : pd.DataFrame
-            DESCRIPTION.
+            DataFrame with feature data.
         y : pd.DataFrame
-            DESCRIPTION.
+            DataFrame with labels data.
 
         Returns
         -------
         train : pd.DataFrame
-            DESCRIPTION.
+            DataFrame with the train data.
         test : pd.DataFrame
-            DESCRIPTION.
-
+            DataFrame with the test data.
         """
         self.test = y
         if self.scaler1 is not None:
@@ -654,9 +652,6 @@ class Pipeline:
         results : PostProcessing object
             An instance from PostProcessing class that allows plotting some analyzes
             for neural networks.
-
-        Examples
-        --------
         """
         results = PostProcessing(self.train, self.test, self.name)
         return results
@@ -667,9 +662,6 @@ class Pipeline:
         This function saves the required files for the neural network model.
         It creates a new folder named after the "name" argument passed to Pipeline
         initialization. This folder can be found within the rossml folder package.
-
-        Examples
-        --------
         """
         path = Path(__file__).parent / f"models/{self.name}"
         if not path.exists():
@@ -677,7 +669,8 @@ class Pipeline:
 
         self.model.save(path / r"{}.h5".format(self.name))
         dump(self.y.columns, open(path / r"{}_columns.pkl".format(self.name), "wb"))
-        dump(self.best, open(path / r"{}_best_features.pkl".format(self.name), "wb"))
+        if self.best is not None:
+            dump(self.best, open(path / r"{}_best_features.pkl".format(self.name), "wb"))
         dump(self.columns, open(path / r"{}_features.pkl".format(self.name), "wb"))
         dump(
             self.df.describe(), open(path / r"{}_describe.pkl".format(self.name), "wb")
@@ -750,7 +743,7 @@ class Model:
         Returns
         -------
         results : pd.DataFrame
-            DESCRIPTION.
+            A DataFrame with predictions for the rotordynamics coefficients.
         """
         if self.best is None:
             self.x = x
@@ -804,9 +797,9 @@ class PostProcessing:
     Parameters
     ----------
     train : pd.DataFrame
-        DESCRIPTION.
+        DataFrame with the train data.
     test : pd.DataFrame
-        DESCRIPTION.
+        DataFrame with the test data.
     name : str
         The neural network folder's name to load.
     """
@@ -818,7 +811,7 @@ class PostProcessing:
         self.name = name
 
     def plot_overall_results(self, save_fig=False):
-        """
+        """Create a pairplot with train and test data.
 
         Parameters
         ----------
@@ -863,6 +856,7 @@ class PostProcessing:
 
         if save_fig:
             fig.write_html(str(path / f"models/{self.name}/img/pairplot.html"))
+            fig.write_image(str(path / f"models/{self.name}/img/pairplot.png"))
 
         return fig
 
@@ -939,7 +933,7 @@ class PostProcessing:
                     y=F.y,
                     mode="lines",
                     line=dict(color="magenta", width=2.0, dash="dot"),
-                    name=f"test {v}",
+                    name=f"train {v}",
                     legendgroup=f"train {v}",
                     hoverinfo="none",
                 )
@@ -950,7 +944,7 @@ class PostProcessing:
                 **axes_default,
             )
             fig.update_yaxes(
-                title=dict(text="Cumulative Distribution Function", font=dict(size=15)),
+                title=dict(text="Cumulative Density Function", font=dict(size=15)),
                 **axes_default,
             )
             fig.update_layout(
@@ -965,7 +959,7 @@ class PostProcessing:
 
             if save_fig:
                 fig.write_html(str(path / f"models/{self.name}/img/CI_{v}.html"))
-
+                fig.write_image(str(path / f"models/{self.name}/img/CI_{v}.png"))
         return figures
 
     def plot_qq(self, save_fig=False):
@@ -1042,6 +1036,7 @@ class PostProcessing:
 
             if save_fig:
                 fig.write_html(str(path / f"models/{self.name}/img/qq_plot_{v}.html"))
+                fig.write_image(str(path / f"models/{self.name}/img/qq_plot_{v}.png"))
 
         return figures
 
@@ -1097,7 +1092,7 @@ class PostProcessing:
                 **axes_default,
             )
             fig.update_yaxes(
-                title=dict(text=f"Standardized Error", font=dict(size=15)),
+                title=dict(text=f"Standardized Residuals", font=dict(size=15)),
                 **axes_default,
             )
             fig.update_layout(
@@ -1130,6 +1125,7 @@ class PostProcessing:
                         / f"models/{self.name}/img/standardized_error_{v}_plot.html"
                     )
                 )
+                fig.write_image(str(path / f"models/{self.name}/img/standardized_error_{v}_plot.png"))
 
         return figures
 
@@ -1212,6 +1208,7 @@ class PostProcessing:
 
         if save_fig:
             fig.write_html(str(path / f"models/{self.name}/img/residuals_resume.html"))
+            fig.write_image(str(path / f"models/{self.name}/img/residuals_resume.png"))
 
         return fig
 
@@ -1244,7 +1241,6 @@ class PostProcessing:
 
         from_path = Path(__file__).parent / "template"
         to_path = Path(__file__).parent / f"models/{self.name}"
-        for file in from_path.glob("**/*"):
-            shutil.copy(file, to_path)
-
-        return webbrowser.open(str(to_path / f"{file}.html"), new=2)
+        for f in from_path.glob("**/*"):
+            shutil.copy(f, to_path)
+        return webbrowser.open(str(to_path / f"{file}.html"), new=1)
