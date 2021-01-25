@@ -10,7 +10,7 @@ from tensorflow.keras.models import Sequential
 
 from rossml.pipeline import Model, Pipeline
 
-file = Path(__file__).parent / r"data\seal_data.csv"
+file = Path(__file__).parent / "data/seal_data.csv"
 df = pd.read_csv(file)
 
 
