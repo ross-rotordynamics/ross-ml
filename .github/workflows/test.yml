@@ -34,11 +34,11 @@ jobs:
       - name: Test with pytest
         run: |
           pip install pytest
-          pytest rossml --cov=ross
+          pytest rossml --cov=rossml
       - name: Code Lint 
         run: |
           black --check rossml
-          isort ross --check-only
+          isort rossml --check-only
         if: success()
       - name: Coverage and Deployment
         run: codecov
