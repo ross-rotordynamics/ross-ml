@@ -662,7 +662,11 @@ class Pipeline:
         path = Path(__file__).parent / f"models/{self.name}"
         if not path.exists():
             path.mkdir()
-
+        else:
+            for child in path.glob('*'):
+                if child.is_file():
+                    child.unlink()
+  
         self.model.save(path / r"{}.h5".format(self.name))
         dump(self.y.columns, open(path / r"{}_columns.pkl".format(self.name), "wb"))
         if self.best is not None:
