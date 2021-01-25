@@ -398,12 +398,8 @@ class Pipeline:
                 self.scaler2.inverse_transform(self.y_test), columns=self.y.columns
             )
         else:
-            self.train = pd.DataFrame(
-                self.predictions, columns=self.y.columns
-            )
-            self.test = pd.DataFrame(
-                self.y_test, columns=self.y.columns
-            )
+            self.train = pd.DataFrame(self.predictions, columns=self.y.columns)
+            self.test = pd.DataFrame(self.y_test, columns=self.y.columns)
 
         return self.model, self.predictions
 
@@ -670,7 +666,9 @@ class Pipeline:
         self.model.save(path / r"{}.h5".format(self.name))
         dump(self.y.columns, open(path / r"{}_columns.pkl".format(self.name), "wb"))
         if self.best is not None:
-            dump(self.best, open(path / r"{}_best_features.pkl".format(self.name), "wb"))
+            dump(
+                self.best, open(path / r"{}_best_features.pkl".format(self.name), "wb")
+            )
         dump(self.columns, open(path / r"{}_features.pkl".format(self.name), "wb"))
         dump(
             self.df.describe(), open(path / r"{}_describe.pkl".format(self.name), "wb")
@@ -1125,7 +1123,11 @@ class PostProcessing:
                         / f"models/{self.name}/img/standardized_error_{v}_plot.html"
                     )
                 )
-                fig.write_image(str(path / f"models/{self.name}/img/standardized_error_{v}_plot.png"))
+                fig.write_image(
+                    str(
+                        path / f"models/{self.name}/img/standardized_error_{v}_plot.png"
+                    )
+                )
 
         return figures
 
