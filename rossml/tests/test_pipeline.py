@@ -1,4 +1,6 @@
 """pipeline.py test file"""
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -8,7 +10,8 @@ from tensorflow.keras.models import Sequential
 
 from rossml.pipeline import Model, Pipeline
 
-df = pd.read_csv(r"data\seal_data.csv")
+file = Path(__file__).parent / "data/seal_data.csv"
+df = pd.read_csv(file)
 
 
 @pytest.fixture

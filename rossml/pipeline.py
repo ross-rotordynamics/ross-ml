@@ -34,7 +34,14 @@ from tensorflow.keras.optimizers import Adam
 
 # fmt: on
 
-__all__ = ["HTML_formater", "available_models", "Pipeline", "Model", "PostProcessing"]
+__all__ = [
+    "HTML_formater",
+    "available_models",
+    "remove_model",
+    "Pipeline",
+    "Model",
+    "PostProcessing",
+]
 
 
 def HTML_formater(df, name, file):
@@ -95,6 +102,46 @@ def available_models():
     return dirs
 
 
+def remove_model(name):
+    """Remove a previously saved network model.
+
+    This function removes a neural network from "models" folder.
+
+    Parameters
+    ----------
+    name : str
+        The neural network folder's name to be deleted.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import rossml as rsml
+    >>> file = Path(__file__).parent / "tests/data/seal_data.csv"
+    >>> df = pd.read_csv(file)
+
+    Building the neural network model
+    >>> name = "Model"
+    >>> D = rsml.Pipeline(df, name)
+    >>> sorted(rsml.available_models())
+    ['Model', 'test_model']
+
+    Removing a neural network
+    >>> rsml.remove_model('Model')
+    >>> rsml.available_models()
+    ['test_model']
+    """
+    if isinstance(name, str):
+        path = Path(__file__).parent / f"models/{name}"
+    elif isinstance(name, Path):
+        path = name
+    for child in path.glob("*"):
+        if child.is_file():
+            child.unlink()
+        elif child.is_dir():
+            remove_model(child)
+    path.rmdir()
+
+
 class Pipeline:
     r"""Generate an artificial neural netowrk.
 
@@ -123,50 +170,58 @@ class Pipeline:
     --------
     >>> import pandas as pd
     >>> import rossml as rsml
+    >>> from pathlib import Path
     >>> from sklearn.preprocessing import RobustScaler
 
     Importing and collecting data
-    >>> df = pd.read_csv(r"data\seal_data.csv")
+    >>> file = Path(__file__).parent / "tests/data/seal_data.csv"
+    >>> df = pd.read_csv(file)
 
     Building the neural network model
     >>> name = "Model"  # this name will be used to save your work
     >>> D = rsml.Pipeline(df, name)
 
     Selecting features and labels
-    >>> D.set_features(1, 21)
-    >>> D.set_labels(21, len(D.df.columns))
-    >>> D.feature_reduction(15)
+    >>> features = D.set_features(1, 21)
+    >>> labels = D.set_labels(21, len(D.df.columns))
+    >>> new_features = D.feature_reduction(15)
 
     Data scaling and running the model
-    >>> D.data_scaling(0.1, scalers=[RobustScaler(), RobustScaler()], scaling=True)
-    >>> D.build_Sequential_ANN(4, [50, 50, 50, 50])
-    >>> model, predictions = D.model_run(batch_size=300, epochs=1000)
+    >>> x_train, x_test, y_train, y_test = D.data_scaling(
+    ...     0.1, scalers=[RobustScaler(), RobustScaler()], scaling=True
+    ... )
+    >>> model = D.build_Sequential_ANN(4, [50, 50, 50, 50])
+    >>> model, predictions = D.model_run(batch_size=300, epochs=200)  # doctest: +ELLIPSIS
+    Epoch 1/200...
 
     Get the model configurations to change it afterwards. These evaluations are
     important to decide whether the neural network meets or not the user requirements.
     >>> # model.get_config()
-    >>> D.model_history()
-    >>> D.metrics()
-    >>> D.hypothesis_test()
+    >>> # fig = D.model_history()
+    >>> # D.metrics()
+    >>> df_test = D.hypothesis_test()
 
     Post-processing Data
-    >>> results = PostProcessing(D.train,D.test, name)
+    >>> results = PostProcessing(D.train, D.test, name)
     >>> fig = results.plot_overall_results()
     >>> fig = results.plot_confidence_bounds(a = 0.01)
     >>> fig = results.plot_standardized_error()
     >>> fig = results.plot_qq()
 
     Saving a model
-    >>> D.save()
+    >>> # D.save()
 
     Displays the HTML report
-    >>> url = 'results'
+    >>> # url = 'results'
     >>> # results.report(url)
 
     Loading a neural network model
-    >>> model = rsml.Model("Model")
-    >>> X = Pipeline(df).set_features(0,20)
-    >>> results = model.predict(X)
+    >>> # model = rsml.Model("Model")
+    >>> # X = Pipeline(df).set_features(1, 21)
+    >>> # results = model.predict(X)
+
+    Removing models
+    >>> rsml.remove_model('Model')
     """
 
     def __init__(self, df, name="Model"):
@@ -398,12 +453,8 @@ class Pipeline:
                 self.scaler2.inverse_transform(self.y_test), columns=self.y.columns
             )
         else:
-            self.train = pd.DataFrame(
-                self.predictions, columns=self.y.columns
-            )
-            self.test = pd.DataFrame(
-                self.y_test, columns=self.y.columns
-            )
+            self.train = pd.DataFrame(self.predictions, columns=self.y.columns)
+            self.test = pd.DataFrame(self.y_test, columns=self.y.columns)
 
         return self.model, self.predictions
 
@@ -662,15 +713,24 @@ class Pipeline:
         This function saves the required files for the neural network model.
         It creates a new folder named after the "name" argument passed to Pipeline
         initialization. This folder can be found within the rossml folder package.
+
+        If the model has the same name as a previously saved neural network,
+        the old files will be replaced with the files from the new model.
         """
         path = Path(__file__).parent / f"models/{self.name}"
         if not path.exists():
             path.mkdir()
+        else:
+            for child in path.glob("*"):
+                if child.is_file():
+                    child.unlink()
 
         self.model.save(path / r"{}.h5".format(self.name))
         dump(self.y.columns, open(path / r"{}_columns.pkl".format(self.name), "wb"))
         if self.best is not None:
-            dump(self.best, open(path / r"{}_best_features.pkl".format(self.name), "wb"))
+            dump(
+                self.best, open(path / r"{}_best_features.pkl".format(self.name), "wb")
+            )
         dump(self.columns, open(path / r"{}_features.pkl".format(self.name), "wb"))
         dump(
             self.df.describe(), open(path / r"{}_describe.pkl".format(self.name), "wb")
@@ -1125,7 +1185,11 @@ class PostProcessing:
                         / f"models/{self.name}/img/standardized_error_{v}_plot.html"
                     )
                 )
-                fig.write_image(str(path / f"models/{self.name}/img/standardized_error_{v}_plot.png"))
+                fig.write_image(
+                    str(
+                        path / f"models/{self.name}/img/standardized_error_{v}_plot.png"
+                    )
+                )
 
         return figures
 

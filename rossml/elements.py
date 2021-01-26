@@ -11,6 +11,7 @@ from itertools import repeat
 import numpy as np
 import pandas as pd
 from ross import BearingElement
+
 from rossml.pipeline import Model
 
 __all__ = ["AnnBearingElement", "SealLabyrinthElement", "TiltPadBearingElement"]
@@ -118,27 +119,6 @@ class AnnBearingElement(BearingElement):
     informing how many which are the features and how many kwargs has been entered.
     Users can copy the list directly from the error message to set the correct keys in
     kwargs.
-
-    >>> seal = rsml.AnnBearingElement(
-    ...     n=0,
-    ...     arq=nn_model,
-    ...     seal_radius=141.61,
-    ...     number_of_teeth=22,
-    ...     tooth_pitch=8.58,
-    ...     tooth_height=8.37,
-    ...     radial_clearance=0.16309,
-    ...     methane=0.11907,
-    ...     hydrogen=0.11584,
-    ...     oxygen=0.05794,
-    ...     co2=0.05224,
-    ...     reservoir_temperature=25.0,
-    ...     reservoir_pressure=568.90,
-    ...     sump_pressure=5.3,
-    ...     inlet_tangential_velocity_ratio=0.617,
-    ...     whirl_speed=8310.5,
-    ...     speeds=[7658.3],
-    ... ) # doctest: +ELLIPSIS
-    KeyError...
     """
 
     def __init__(self, arq=None, n=None, n_link=None, scale_factor=1.0, **kwargs):
