@@ -123,34 +123,39 @@ class Pipeline:
     --------
     >>> import pandas as pd
     >>> import rossml as rsml
+    >>> from pathlib import Path
     >>> from sklearn.preprocessing import RobustScaler
 
     Importing and collecting data
-    >>> df = pd.read_csv("tests/data/seal_data.csv")
+    >>> file = Path(__file__).parent / "tests/data/seal_data.csv"
+    >>> df = pd.read_csv(file)
 
     Building the neural network model
     >>> name = "Model"  # this name will be used to save your work
     >>> D = rsml.Pipeline(df, name)
 
     Selecting features and labels
-    >>> D.set_features(1, 21)
-    >>> D.set_labels(21, len(D.df.columns))
-    >>> D.feature_reduction(15)
+    >>> features = D.set_features(1, 21)
+    >>> labels = D.set_labels(21, len(D.df.columns))
+    >>> new_features = D.feature_reduction(15)
 
     Data scaling and running the model
-    >>> D.data_scaling(0.1, scalers=[RobustScaler(), RobustScaler()], scaling=True)
-    >>> D.build_Sequential_ANN(4, [50, 50, 50, 50])
-    >>> model, predictions = D.model_run(batch_size=300, epochs=1000)
+    >>> x_train, x_test, y_train, y_test = D.data_scaling(
+    ...     0.1, scalers=[RobustScaler(), RobustScaler()], scaling=True
+    ... )
+    >>> model = D.build_Sequential_ANN(4, [50, 50, 50, 50])
+    >>> model, predictions = D.model_run(batch_size=300, epochs=200)  # doctest: +ELLIPSIS
+    Epoch 1/200...
 
     Get the model configurations to change it afterwards. These evaluations are
     important to decide whether the neural network meets or not the user requirements.
     >>> # model.get_config()
-    >>> D.model_history()
-    >>> D.metrics()
-    >>> D.hypothesis_test()
+    >>> fig = D.model_history()
+    >>> # D.metrics()
+    >>> df_test = D.hypothesis_test()
 
     Post-processing Data
-    >>> results = PostProcessing(D.train,D.test, name)
+    >>> results = PostProcessing(D.train, D.test, name)
     >>> fig = results.plot_overall_results()
     >>> fig = results.plot_confidence_bounds(a = 0.01)
     >>> fig = results.plot_standardized_error()
@@ -164,8 +169,10 @@ class Pipeline:
     >>> # results.report(url)
 
     Loading a neural network model
-    >>> model = rsml.Model("Model")
-    >>> X = Pipeline(df).set_features(0,20)
+    >>> rsml.available_models()
+    ['Model', 'test_model']
+    >>> model = rsml.Model("test_model")
+    >>> X = Pipeline(df).set_features(1, 21)
     >>> results = model.predict(X)
     """
 
