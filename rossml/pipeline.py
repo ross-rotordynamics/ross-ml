@@ -34,7 +34,14 @@ from tensorflow.keras.optimizers import Adam
 
 # fmt: on
 
-__all__ = ["HTML_formater", "available_models", "Pipeline", "Model", "PostProcessing"]
+__all__ = [
+    "HTML_formater",
+    "available_models",
+    "remove_model",
+    "Pipeline",
+    "Model",
+    "PostProcessing"
+]
 
 
 def HTML_formater(df, name, file):
@@ -93,6 +100,46 @@ def available_models():
         dirs = "No neural network models available."
 
     return dirs
+
+
+def remove_model(name):
+    """Remove a previously saved network model.
+
+    This function removes a neural network from "models" folder.
+
+    Parameters
+    ----------
+    name : str
+        The neural network folder's name to be deleted.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import rossml as rsml
+    >>> file = Path(__file__).parent / "tests/data/seal_data.csv"
+    >>> df = pd.read_csv(file)
+
+    Building the neural network model
+    >>> name = "Model"
+    >>> D = rsml.Pipeline(df, name)
+    >>> rsml.available_models()
+    ['Model', 'test_model']
+
+    Removing a neural network
+    >>> rsml.remove_model('Model')
+    >>> rsml.available_models()
+    ['test_model']
+    """
+    if isinstance(name, str):
+        path = Path(__file__).parent / f"models/{name}"
+    elif isinstance(name, Path):
+        path = name
+    for child in path.glob('*'):
+        if child.is_file():
+            child.unlink()
+        elif child.is_dir():
+            remove_model(child)
+    path.rmdir()
 
 
 class Pipeline:
@@ -172,6 +219,9 @@ class Pipeline:
     >>> # model = rsml.Model("Model")
     >>> # X = Pipeline(df).set_features(1, 21)
     >>> # results = model.predict(X)
+
+    Removing models
+    >>> rsml.remove_model('Model')
     """
 
     def __init__(self, df, name="Model"):
