@@ -123,7 +123,7 @@ def remove_model(name):
     >>> name = "Model"
     >>> D = rsml.Pipeline(df, name)
     >>> rsml.available_models()
-    ['Model', 'test_model']
+    ['test_model', 'Model']
 
     Removing a neural network
     >>> rsml.remove_model('Model')
