@@ -40,7 +40,7 @@ __all__ = [
     "remove_model",
     "Pipeline",
     "Model",
-    "PostProcessing"
+    "PostProcessing",
 ]
 
 
@@ -134,7 +134,7 @@ def remove_model(name):
         path = Path(__file__).parent / f"models/{name}"
     elif isinstance(name, Path):
         path = name
-    for child in path.glob('*'):
+    for child in path.glob("*"):
         if child.is_file():
             child.unlink()
         elif child.is_dir():
@@ -713,15 +713,18 @@ class Pipeline:
         This function saves the required files for the neural network model.
         It creates a new folder named after the "name" argument passed to Pipeline
         initialization. This folder can be found within the rossml folder package.
+
+        If the model has the same name as a previously saved neural network,
+        the old files will be replaced with the files from the new model.
         """
         path = Path(__file__).parent / f"models/{self.name}"
         if not path.exists():
             path.mkdir()
         else:
-            for child in path.glob('*'):
+            for child in path.glob("*"):
                 if child.is_file():
                     child.unlink()
-  
+
         self.model.save(path / r"{}.h5".format(self.name))
         dump(self.y.columns, open(path / r"{}_columns.pkl".format(self.name), "wb"))
         if self.best is not None:
