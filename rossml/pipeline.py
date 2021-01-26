@@ -150,7 +150,7 @@ class Pipeline:
     Get the model configurations to change it afterwards. These evaluations are
     important to decide whether the neural network meets or not the user requirements.
     >>> # model.get_config()
-    >>> fig = D.model_history()
+    >>> # fig = D.model_history()
     >>> # D.metrics()
     >>> df_test = D.hypothesis_test()
 
@@ -162,18 +162,16 @@ class Pipeline:
     >>> fig = results.plot_qq()
 
     Saving a model
-    >>> D.save()
+    >>> # D.save()
 
     Displays the HTML report
-    >>> url = 'results'
+    >>> # url = 'results'
     >>> # results.report(url)
 
     Loading a neural network model
-    >>> rsml.available_models()
-    ['Model', 'test_model']
-    >>> model = rsml.Model("test_model")
-    >>> X = Pipeline(df).set_features(1, 21)
-    >>> results = model.predict(X)
+    >>> # model = rsml.Model("Model")
+    >>> # X = Pipeline(df).set_features(1, 21)
+    >>> # results = model.predict(X)
     """
 
     def __init__(self, df, name="Model"):
