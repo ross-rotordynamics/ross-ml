@@ -926,7 +926,7 @@ class PostProcessing:
         Parameters
         ----------
         a : float
-            Significance level.A number between 0 and 1.
+            Significance level. A number between 0 and 1.
         percentile : float, optional
             Percentile to compute, which must be between 0 and 100 inclusive.
         save_fig : bool, optional
@@ -970,7 +970,7 @@ class PostProcessing:
                     fill="toself",
                     fillcolor="lightblue",
                     opacity=0.6,
-                    name=f"{v} - {100 * (1 - percentile)}% Confidence Interval",
+                    name=f"{v} - {100 * (1 - a)}% Confidence Interval",
                     legendgroup=f"CI - {v}",
                     hoverinfo="none",
                 )
