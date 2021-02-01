@@ -1127,8 +1127,8 @@ class PostProcessing:
 
         figures = []
         for v in var:
-            error = self.test[v] - self.train[v]
-            error = error / error.std()
+            aux_error = self.test[v] - self.train[v]
+            error = aux_error / aux_error.std()
             error.dropna(inplace=True)
             fig = go.Figure()
 
@@ -1156,7 +1156,7 @@ class PostProcessing:
                 **axes_default,
             )
             fig.update_layout(
-                title_text=f"Standard Deviation: {np.round(np.std(error), 2)}",
+                title_text=f"Standard Deviation: {np.round(np.std(aux_error), 2)}",
                 plot_bgcolor="white",
                 legend=dict(
                     bgcolor="white",
