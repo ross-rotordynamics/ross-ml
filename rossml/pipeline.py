@@ -920,7 +920,7 @@ class PostProcessing:
 
         return fig
 
-    def plot_confidence_bounds(self, a=0.01, percentile=0.05, save_fig=False):
+    def plot_confidence_bounds(self, a=0.01, save_fig=False):
         """Plot and save a confidence interval based on DKW inequality.
 
         Parameters
@@ -939,8 +939,7 @@ class PostProcessing:
             List of figures plotting DKW inequality for each variable in dataframe.
         """
         path = Path(__file__).parent
-        P = np.arange(0, 100, percentile)
-        en = np.sqrt((1 / (2 * len(P))) * np.log(2 / a))
+        en = np.sqrt((1 / (2 * len(self.test))) * np.log(2 / a))
         var = list(self.train.columns)
 
         axes_default = dict(
